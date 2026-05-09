@@ -64,15 +64,18 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { User, Cpu, ArrowLeft, Top } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
+import { chatMemoryApi } from '@/api/chatMemory'
 
 const router = useRouter()
+const route = useRoute()
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
 const isSending = ref(false)
+const chatId = ref('')
 const messagesContainer = ref(null)
 
 const getCurrentTime = () => {
@@ -112,7 +115,7 @@ const sendMessage = async () => {
   })
   
   try {
-    const stream = aiApi.doChatWithManus(userMessage)
+    const stream = aiApi.doChatWithManus(userMessage, chatId.value)
     const reader = stream.getReader()
     
     while (true) {
@@ -135,6 +138,19 @@ const sendMessage = async () => {
 const goBack = () => {
   router.push('/')
 }
+
+onMounted(async () => {
+  if (route.query.conversationId) {
+    chatId.value = route.query.conversationId
+  } else {
+    try {
+      const res = await chatMemoryApi.newConversationId()
+      chatId.value = res.data
+    } catch (error) {
+      console.error('获取会话ID失败:', error)
+    }
+  }
+})
 
 const formatContent = (content) => {
   if (!content) return []
