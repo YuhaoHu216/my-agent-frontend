@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /d:/Code/fullstack/my-agent/frontend/my-agent-frontend/)",
+      "Read(//d:/Code/fullstack/my-agent/frontend/**)",
+      "Bash(find /d:/Code/fullstack/my-agent/frontend/my-agent-frontend/src -type f | sort)",
+      "Read(//d:/Code/fullstack/my-agent/frontend/my-agent-frontend/**)",
+      "Bash(npx vite *)"
+    ]
+  }
+}

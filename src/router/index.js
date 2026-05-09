@@ -3,18 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: () => import('../views/Home.vue'),
+    redirect: '/chat-room',
   },
   {
     path: '/chat-room',
     name: 'ChatRoom',
     component: () => import('../views/ChatRoom.vue'),
-  },
-  {
-    path: '/manus-chat',
-    name: 'ManusChat',
-    component: () => import('../views/ManusChat.vue'),
   },
   {
     path: '/login',
@@ -33,7 +27,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
   
   if (!token && to.path !== '/login' && to.path !== '/register') {

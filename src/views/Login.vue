@@ -79,7 +79,7 @@ const handleLogin = async () => {
         if (res.code === 200) {
           localStorage.setItem('token', res.data)
           ElMessage.success('登录成功')
-          router.push('/')
+          router.push('/chat-room')
         } else {
           ElMessage.error(res.message || '登录失败')
         }
