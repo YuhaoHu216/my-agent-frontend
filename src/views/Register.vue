@@ -41,6 +41,14 @@
             clearable
           />
         </el-form-item>
+
+        <el-form-item label="邀请码" prop="inviteCode">
+          <el-input
+            v-model="registerForm.inviteCode"
+            placeholder="请输入邀请码"
+            clearable
+          />
+        </el-form-item>
         
         <el-form-item>
           <el-button
@@ -73,7 +81,8 @@ const registerForm = reactive({
   username: '',
   password: '',
   email: '',
-  phone: ''
+  phone: '',
+  inviteCode: ''
 })
 
 const validateUsername = (rule, value, callback) => {
@@ -107,6 +116,14 @@ const validateEmail = (rule, value, callback) => {
   }
 }
 
+const validateInviteCode = (rule, value, callback) => {
+  if (!value || !value.trim()) {
+    callback(new Error('请输入邀请码'))
+  } else {
+    callback()
+  }
+}
+
 const rules = {
   username: [
     { validator: validateUsername, trigger: 'blur' }
@@ -116,6 +133,9 @@ const rules = {
   ],
   email: [
     { validator: validateEmail, trigger: 'blur' }
+  ],
+  inviteCode: [
+    { validator: validateInviteCode, trigger: 'blur' }
   ]
 }
 
