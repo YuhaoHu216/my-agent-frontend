@@ -1,41 +1,82 @@
 <template>
   <div class="chat-layout">
     <div class="sidebar">
-      <div class="sidebar-header">
-        <h2>历史会话</h2>
-        <el-button type="primary" size="small" @click="handleNewChat" :loading="creatingNew">
-          <el-icon><Plus /></el-icon>
-          新建会话
-        </el-button>
-      </div>
-      <div class="session-list" v-loading="loadingSessions">
-        <div
-          v-for="session in sessions"
-          :key="session.id"
-          :class="['session-item', { active: session.id === chatId }]"
-          @click="enterSession(session.id)"
-        >
-          <span class="session-name">{{ session.name }}</span>
-          <span class="session-actions">
-            <el-button link size="small" @click.stop="handleRename(session)">
-              <el-icon><Edit /></el-icon>
+      <el-tabs v-model="activeSidebarTab" class="sidebar-tabs">
+        <el-tab-pane label="会话" name="sessions">
+          <div class="sidebar-header">
+            <h2>历史会话</h2>
+            <el-button type="primary" size="small" @click="handleNewChat" :loading="creatingNew">
+              <el-icon><Plus /></el-icon>
+              新建会话
             </el-button>
-            <el-popconfirm
-              title="确定要删除该会话吗？"
-              confirm-button-text="删除"
-              cancel-button-text="取消"
-              @confirm="handleDelete(session.id)"
+          </div>
+          <div class="session-list" v-loading="loadingSessions">
+            <div
+              v-for="session in sessions"
+              :key="session.id"
+              :class="['session-item', { active: session.id === chatId }]"
+              @click="enterSession(session.id)"
             >
-              <template #reference>
-                <el-button link size="small" @click.stop>
-                  <el-icon><Delete /></el-icon>
+              <span class="session-name">{{ session.name }}</span>
+              <span class="session-actions">
+                <el-button link size="small" @click.stop="handleRename(session)">
+                  <el-icon><Edit /></el-icon>
                 </el-button>
-              </template>
-            </el-popconfirm>
-          </span>
-        </div>
-        <el-empty v-if="!loadingSessions && sessions.length === 0" description="暂无历史会话" :image-size="60" />
-      </div>
+                <el-popconfirm
+                  title="确定要删除该会话吗？"
+                  confirm-button-text="删除"
+                  cancel-button-text="取消"
+                  @confirm="handleDelete(session.id)"
+                >
+                  <template #reference>
+                    <el-button link size="small" @click.stop>
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </template>
+                </el-popconfirm>
+              </span>
+            </div>
+            <el-empty v-if="!loadingSessions && sessions.length === 0" description="暂无历史会话" :image-size="60" />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="文档" name="documents">
+          <div class="doc-search-bar">
+            <el-input v-model="searchQuery" placeholder="搜索文档..." size="small" clearable @keyup.enter="handleDocSearch" />
+            <el-button size="small" type="primary" @click="handleDocSearch" :loading="searching">搜索</el-button>
+          </div>
+          <div class="doc-upload-bar">
+            <el-upload :auto-upload="false" :show-file-list="false" :on-change="handleFileChange" accept="*">
+              <el-button size="small" type="primary" plain>
+                <el-icon><Upload /></el-icon> 上传文档
+              </el-button>
+            </el-upload>
+          </div>
+          <div class="doc-list" v-loading="loadingDocs">
+            <div
+              v-for="doc in filteredDocs"
+              :key="doc.id"
+              :class="['doc-item', { active: selectedDocId === doc.id }]"
+              @click="selectedDocId = doc.id"
+            >
+              <span class="doc-name">{{ doc.fileName }}</span>
+              <el-popconfirm
+                title="确定要删除该文档吗？"
+                confirm-button-text="删除"
+                cancel-button-text="取消"
+                @confirm="handleDocDelete(doc.id)"
+              >
+                <template #reference>
+                  <el-button link size="small" @click.stop>
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </div>
+            <el-empty v-if="!loadingDocs && filteredDocs.length === 0" description="暂无文档" :image-size="60" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
     </div>
 
     <div class="main-area">
@@ -135,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -149,10 +190,12 @@ import {
   Message,
   Phone,
   Calendar,
-  SwitchButton
+  SwitchButton,
+  Upload
 } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
 import { chatMemoryApi } from '@/api/chatMemory'
+import { documentApi } from '@/api/document'
 import { userApi } from '@/api/user'
 
 const router = useRouter()
@@ -171,6 +214,22 @@ const messagesContainer = ref(null)
 const sessions = ref([])
 const loadingSessions = ref(false)
 const creatingNew = ref(false)
+
+// Sidebar tabs
+const activeSidebarTab = ref('sessions')
+
+// Document management
+const docs = ref([])
+const loadingDocs = ref(false)
+const searchQuery = ref('')
+const searching = ref(false)
+const searchResults = ref(null)
+const selectedDocId = ref(null)
+const uploading = ref(false)
+
+const filteredDocs = computed(() => {
+  return searchResults.value !== null ? searchResults.value : docs.value
+})
 
 // User info
 const userInfo = ref(null)
@@ -363,6 +422,81 @@ const handleDelete = async (id) => {
   }
 }
 
+// Document management
+const loadDocs = async () => {
+  loadingDocs.value = true
+  try {
+    const res = await documentApi.list()
+    if (res.code === 200 && res.data) {
+      docs.value = res.data
+      searchResults.value = null
+    }
+  } catch (error) {
+    console.error('获取文档列表失败:', error)
+  } finally {
+    loadingDocs.value = false
+  }
+}
+
+const handleDocSearch = async () => {
+  if (!searchQuery.value.trim()) {
+    await loadDocs()
+    return
+  }
+  searching.value = true
+  try {
+    const res = await documentApi.search(searchQuery.value.trim())
+    if (res.code === 200 && res.data) {
+      searchResults.value = res.data
+    }
+  } catch (error) {
+    console.error('搜索文档失败:', error)
+    ElMessage.error('搜索失败')
+  } finally {
+    searching.value = false
+  }
+}
+
+const handleFileChange = async (file) => {
+  uploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file.raw)
+    const res = await documentApi.upload(formData)
+    if (res.code === 200) {
+      ElMessage.success('上传成功')
+      await loadDocs()
+    }
+  } catch (error) {
+    console.error('上传文档失败:', error)
+    ElMessage.error('上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+const handleDocDelete = async (id) => {
+  try {
+    const res = await documentApi.deleteById(id)
+    if (res.code === 200) {
+      docs.value = docs.value.filter(d => d.id !== id)
+      if (searchResults.value !== null) {
+        searchResults.value = searchResults.value.filter(d => d.id !== id)
+      }
+      ElMessage.success('删除成功')
+    }
+  } catch (error) {
+    console.error('删除文档失败:', error)
+    ElMessage.error('删除失败')
+  }
+}
+
+watch(activeSidebarTab, (newTab) => {
+  if (newTab === 'documents') {
+    loadDocs()
+  }
+})
+
 // User info
 const loadUserInfo = async () => {
   const token = localStorage.getItem('token')
@@ -521,6 +655,77 @@ onMounted(async () => {
       align-items: center;
       gap: 4px;
       flex-shrink: 0;
+    }
+  }
+}
+
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  :deep(.el-tabs__header) {
+    margin: 0;
+    padding: 0 16px;
+  }
+
+  :deep(.el-tabs__content) {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-tab-pane) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.doc-search-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+
+  .el-input {
+    flex: 1;
+  }
+}
+
+.doc-upload-bar {
+  padding: 0 16px 8px;
+}
+
+.doc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+
+  .doc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: #f5f5f5;
+    }
+
+    &.active {
+      background-color: #e6f7ff;
+      border-right: 3px solid #409eff;
+    }
+
+    .doc-name {
+      flex: 1;
+      font-size: 13px;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 }
