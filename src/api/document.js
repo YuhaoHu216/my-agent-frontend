@@ -40,5 +40,19 @@ export const documentApi = {
 
   deleteById(id) {
     return request.delete(`/document/${id}`)
+  },
+
+  async downloadById(id, fileName) {
+    const blob = await request.get(`/document/download/${id}`, {
+      responseType: 'blob'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
   }
 }

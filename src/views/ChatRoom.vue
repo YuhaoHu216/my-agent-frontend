@@ -60,18 +60,23 @@
               @click="selectedDocId = doc.id"
             >
               <span class="doc-name">{{ doc.fileName }}</span>
-              <el-popconfirm
-                title="确定要删除该文档吗？"
-                confirm-button-text="删除"
-                cancel-button-text="取消"
-                @confirm="handleDocDelete(doc.id)"
-              >
-                <template #reference>
-                  <el-button link size="small" @click.stop>
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </template>
-              </el-popconfirm>
+              <span class="doc-actions">
+                <el-button link size="small" @click.stop="handleDocDownload(doc)">
+                  <el-icon><Download /></el-icon>
+                </el-button>
+                <el-popconfirm
+                  title="确定要删除该文档吗？"
+                  confirm-button-text="删除"
+                  cancel-button-text="取消"
+                  @confirm="handleDocDelete(doc.id)"
+                >
+                  <template #reference>
+                    <el-button link size="small" @click.stop>
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </template>
+                </el-popconfirm>
+              </span>
             </div>
             <el-empty v-if="!loadingDocs && filteredDocs.length === 0" description="暂无文档" :image-size="60" />
           </div>
@@ -187,6 +192,7 @@ import {
   Plus,
   Edit,
   Delete,
+  Download,
   Message,
   Phone,
   Calendar,
@@ -491,6 +497,15 @@ const handleDocDelete = async (id) => {
   }
 }
 
+const handleDocDownload = async (doc) => {
+  try {
+    await documentApi.downloadById(doc.id, doc.fileName)
+  } catch (error) {
+    console.error('下载文档失败:', error)
+    ElMessage.error('下载失败')
+  }
+}
+
 watch(activeSidebarTab, (newTab) => {
   if (newTab === 'documents') {
     loadDocs()
@@ -712,6 +727,10 @@ onMounted(async () => {
 
     &:hover {
       background-color: #f5f5f5;
+
+      .doc-actions {
+        opacity: 1;
+      }
     }
 
     &.active {
@@ -726,6 +745,15 @@ onMounted(async () => {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .doc-actions {
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
     }
   }
 }
