@@ -27,13 +27,15 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
-  
-  if (!token && to.path !== '/login' && to.path !== '/register') {
-    next('/login')
-  } else {
-    next()
+  const isAuthPage = to.path === '/login' || to.path === '/register'
+
+  if (!token && !isAuthPage) {
+    return '/login'
+  }
+  if (token && isAuthPage) {
+    return '/chat-room'
   }
 })
 
