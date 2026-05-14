@@ -333,6 +333,8 @@ const formatContent = (content) => {
 
 // Session sidebar methods
 const loadSessions = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) return
   loadingSessions.value = true
   try {
     const res = await chatMemoryApi.getAllConversationsSummary()
@@ -566,6 +568,11 @@ const formatTime = (timeStr) => {
 }
 
 onMounted(async () => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    router.push('/login')
+    return
+  }
   loadUserInfo()
   await loadSessions()
 

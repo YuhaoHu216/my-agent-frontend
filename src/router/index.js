@@ -27,15 +27,17 @@ const router = createRouter({
   routes,
 })
 
+const WHITE_LIST = ['/login', '/register']
+
 router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
-  const isAuthPage = to.path === '/login' || to.path === '/register'
 
-  if (!token && !isAuthPage) {
-    return '/login'
+  if (WHITE_LIST.includes(to.path)) {
+    return
   }
-  if (token && isAuthPage) {
-    return '/chat-room'
+
+  if (!token) {
+    return `/login?redirect=${encodeURIComponent(to.fullPath)}`
   }
 })
 
