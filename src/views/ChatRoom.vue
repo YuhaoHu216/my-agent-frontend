@@ -472,6 +472,8 @@ const handleFileChange = async (file) => {
     if (res.code === 200) {
       ElMessage.success('上传成功')
       await loadDocs()
+    } else {
+      ElMessage.error(res.message || '上传失败')
     }
   } catch (error) {
     console.error('上传文档失败:', error)
