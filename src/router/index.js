@@ -2,10 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
-    path: '/',
-    redirect: '/chat-room',
-  },
-  {
     path: '/chat-room',
     name: 'ChatRoom',
     component: () => import('../views/ChatRoom.vue'),
@@ -32,13 +28,26 @@ const WHITE_LIST = ['/login', '/register']
 router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
 
+  // 白名单路由直接放行
   if (WHITE_LIST.includes(to.path)) {
-    return
+    return true
   }
 
+  // 无 token：重定向到登录页，携带目标路径用于登录后回跳
   if (!token) {
-    return `/login?redirect=${encodeURIComponent(to.fullPath)}`
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath },
+    }
   }
+
+  // 有 token 但访问根路径：重定向到 chat-room
+  if (to.path === '/') {
+    return '/chat-room'
+  }
+
+  // 有 token 访问受保护路由：放行
+  return true
 })
 
 export default router

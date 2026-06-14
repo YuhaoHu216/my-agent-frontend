@@ -46,11 +46,12 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userApi } from '../api/user'
 
 const router = useRouter()
+const route = useRoute()
 const loginFormRef = ref(null)
 const loading = ref(false)
 
@@ -79,7 +80,8 @@ const handleLogin = async () => {
         if (res.code === 200) {
           localStorage.setItem('token', res.data)
           ElMessage.success('登录成功')
-          router.push('/chat-room')
+          const redirect = route.query.redirect
+          router.push(redirect || '/chat-room')
         } else {
           ElMessage.error(res.message || '登录失败')
         }

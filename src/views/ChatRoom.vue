@@ -570,7 +570,7 @@ const formatTime = (timeStr) => {
 onMounted(async () => {
   const token = localStorage.getItem('token')
   if (!token) {
-    router.push('/login')
+    router.replace('/login')
     return
   }
   loadUserInfo()
