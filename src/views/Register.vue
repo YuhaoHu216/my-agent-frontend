@@ -1,67 +1,93 @@
 <template>
   <div class="register-container">
-    <div class="register-box">
-      <h1 class="title">用户注册</h1>
-      
+    <!-- 背景遮罩层 -->
+    <div class="overlay"></div>
+
+    <!-- 注册表单卡片 -->
+    <div class="register-card">
+      <h1 class="title">CREATE ACCOUNT</h1>
+
       <el-form
         ref="registerFormRef"
         :model="registerForm"
         :rules="rules"
-        label-width="80px"
+        class="register-form"
       >
-        <el-form-item label="用户名" prop="username">
-          <el-input
-            v-model="registerForm.username"
-            placeholder="请输入用户名（3-20 个字符）"
-            clearable
-          />
-        </el-form-item>
-        
-        <el-form-item label="密码" prop="password">
-          <el-input
-            v-model="registerForm.password"
-            type="password"
-            placeholder="请输入密码（6-20 个字符）"
-            show-password
-          />
-        </el-form-item>
-        
-        <el-form-item label="邮箱" prop="email">
-          <el-input
-            v-model="registerForm.email"
-            placeholder="请输入邮箱地址"
-            clearable
-          />
-        </el-form-item>
-        
-        <el-form-item label="手机号" prop="phone">
-          <el-input
-            v-model="registerForm.phone"
-            placeholder="请输入手机号（可选）"
-            clearable
-          />
+        <!-- 用户名 -->
+        <el-form-item prop="username" class="form-item animate-in-1">
+          <div class="input-wrap">
+            <el-input
+              v-model="registerForm.username"
+              placeholder="请输入用户名（3-20 个字符）"
+            />
+            <i class="fa-solid fa-user input-icon"></i>
+          </div>
         </el-form-item>
 
-        <el-form-item label="邀请码" prop="inviteCode">
-          <el-input
-            v-model="registerForm.inviteCode"
-            placeholder="请输入邀请码"
-            clearable
-          />
+        <!-- 密码 -->
+        <el-form-item prop="password" class="form-item animate-in-2">
+          <div class="input-wrap">
+            <el-input
+              v-model="registerForm.password"
+              type="password"
+              placeholder="请输入密码（6-20 个字符）"
+              show-password
+            />
+            <i class="fa-solid fa-lock input-icon"></i>
+          </div>
         </el-form-item>
-        
-        <el-form-item>
-          <el-button
-            type="primary"
-            :loading="loading"
+
+        <!-- 邮箱 -->
+        <el-form-item prop="email" class="form-item animate-in-3">
+          <div class="input-wrap">
+            <el-input
+              v-model="registerForm.email"
+              placeholder="请输入邮箱地址"
+            />
+            <i class="fa-solid fa-envelope input-icon"></i>
+          </div>
+        </el-form-item>
+
+        <!-- 手机号 -->
+        <el-form-item prop="phone" class="form-item animate-in-4">
+          <div class="input-wrap">
+            <el-input
+              v-model="registerForm.phone"
+              placeholder="请输入手机号（可选）"
+            />
+            <i class="fa-solid fa-phone input-icon"></i>
+          </div>
+        </el-form-item>
+
+        <!-- 邀请码 -->
+        <el-form-item prop="inviteCode" class="form-item animate-in-5">
+          <div class="input-wrap">
+            <el-input
+              v-model="registerForm.inviteCode"
+              placeholder="请输入邀请码"
+            />
+            <i class="fa-solid fa-ticket input-icon"></i>
+          </div>
+        </el-form-item>
+
+        <!-- 注册按钮 -->
+        <el-form-item class="form-item animate-in-6">
+          <button
+            type="button"
+            class="register-btn"
+            :disabled="loading"
             @click="handleRegister"
           >
-            注册
-          </el-button>
-          <el-button @click="goToLogin">
-            返回登录
-          </el-button>
+            <span v-if="!loading">注 册</span>
+            <span v-else class="loading-text">注册中...</span>
+          </button>
         </el-form-item>
+
+        <!-- 返回登录链接 -->
+        <p class="login-link animate-in-7">
+          已有账号？
+          <a @click="goToLogin">返回登录</a>
+        </p>
       </el-form>
     </div>
   </div>
@@ -141,7 +167,7 @@ const rules = {
 
 const handleRegister = async () => {
   if (!registerFormRef.value) return
-  
+
   await registerFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
@@ -168,26 +194,249 @@ const goToLogin = () => {
 </script>
 
 <style scoped lang="scss">
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+// ========== 容器 & 背景 ==========
 .register-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: url('@/assets/back.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  position: relative;
+  font-family: 'Poppins', sans-serif;
 }
 
-.register-box {
-  width: 400px;
-  padding: 40px;
-  background: #fff;
+// 暗色遮罩层
+.overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+// ========== 注册卡片（玻璃态） ==========
+.register-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  width: 38%;
+  min-width: 400px;
+  max-width: 550px;
+  padding: 50px 10px;
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  
+  border: 1px solid rgba(255, 255, 255, 0.329);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.13);
+  overflow: hidden;
+}
+
+// ========== 标题 ==========
+.title {
+  font-size: 2.6rem;
+  color: white;
+  margin: 0 0 40px;
+  letter-spacing: 3px;
+  font-weight: 700;
+
+  animation: slideUp 1s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.2s;
+}
+
+// ========== 表单 ==========
+.register-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.form-item {
+  width: 90%;
+  margin-bottom: 24px;
+}
+
+// ========== 输入框包装器 ==========
+.input-wrap {
+  border: 1px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 55px;
+  width: 100%;
+  border-radius: 50px;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.459);
+  overflow: hidden;
+
+  :deep(.el-input) {
+    flex: 1;
+    height: 100%;
+
+    .el-input__wrapper {
+      background-color: transparent;
+      box-shadow: none;
+      border: none;
+      padding: 5px 25px;
+      height: 100%;
+      border-radius: 0;
+
+      .el-input__inner {
+        color: white;
+        font-size: 1.1rem;
+        font-family: 'Poppins', sans-serif;
+        background: transparent;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 1.1rem;
+          font-family: 'Poppins', sans-serif;
+        }
+      }
+
+      .el-input__suffix {
+        .el-icon {
+          color: white;
+        }
+      }
+    }
+
+    .el-input__wrapper.is-focus {
+      box-shadow: none;
+      border: none;
+    }
+  }
+}
+
+.input-icon {
+  font-size: 1.1rem;
+  color: white;
+  padding-right: 25px;
+  flex-shrink: 0;
+}
+
+:deep(.el-form-item__error) {
+  color: #ff6b6b;
+  padding-left: 25px;
+  font-size: 0.85rem;
+}
+
+// ========== 注册按钮 ==========
+.register-btn {
+  font-size: 1.2rem;
+  height: 55px;
+  width: 90%;
+  border-radius: 50px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background-color: white;
+  color: #333;
+  transition: 0.3s;
+  font-family: 'Poppins', sans-serif;
+  margin-top: 10px;
+
+  &:hover:not(:disabled) {
+    background-color: rgb(221, 221, 221);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .loading-text {
+    letter-spacing: 1px;
+  }
+}
+
+// ========== 返回登录链接 ==========
+.login-link {
+  font-size: 1.1rem;
+  color: white;
+  margin-top: 25px;
+  text-align: center;
+
+  a {
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.3s;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+}
+
+// ========== 动画 ==========
+@keyframes slideUp {
+  from {
+    transform: translateY(250px);
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-in-1 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.3s;
+}
+.animate-in-2 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.45s;
+}
+.animate-in-3 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.6s;
+}
+.animate-in-4 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.75s;
+}
+.animate-in-5 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 0.9s;
+}
+.animate-in-6 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 1.05s;
+}
+.animate-in-7 {
+  animation: slideUp 1.2s ease-out forwards;
+  opacity: 0;
+  animation-delay: 1.2s;
+}
+
+// ========== 响应式 ==========
+@media (max-width: 768px) {
+  .register-card {
+    width: 85%;
+    min-width: unset;
+    padding: 40px 10px;
+  }
+
   .title {
-    text-align: center;
-    margin-bottom: 30px;
-    color: #333;
-    font-size: 28px;
+    font-size: 2rem;
   }
 }
 </style>
