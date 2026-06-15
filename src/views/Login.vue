@@ -133,7 +133,11 @@ const goToRegister = () => {
 
 // ========== 容器 & 背景 ==========
 .login-container {
-  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,8 +145,8 @@ const goToRegister = () => {
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
-  position: relative;
   font-family: 'Poppins', sans-serif;
+  overflow: hidden;
 }
 
 // 暗色遮罩层
