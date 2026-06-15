@@ -5,7 +5,7 @@
 
     <!-- 注册表单卡片 -->
     <div class="register-card">
-      <h1 class="title">CREATE ACCOUNT</h1>
+      <h1 class="title">创建账户</h1>
 
       <el-form
         ref="registerFormRef"
@@ -335,11 +335,18 @@ const goToLogin = () => {
   font-size: 0.85rem;
 }
 
+// 修复无 label 时 el-form-item 内容区偏移问题
+:deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
 // ========== 注册按钮 ==========
 .register-btn {
   font-size: 1.2rem;
   height: 55px;
-  width: 90%;
+  width: 60%;
+  display: block;
+  margin: 0 auto;
   border-radius: 50px;
   font-weight: 600;
   letter-spacing: 2px;

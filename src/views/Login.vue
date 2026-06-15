@@ -5,7 +5,7 @@
 
     <!-- 登录表单卡片 -->
     <div class="login-card">
-      <h1 class="title">WELCOME</h1>
+      <h1 class="title">欢迎</h1>
 
       <el-form
         ref="loginFormRef"
@@ -275,6 +275,11 @@ const goToRegister = () => {
   font-size: 0.85rem;
 }
 
+// 修复无 label 时 el-form-item 内容区偏移问题
+:deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
 // ========== 记住我 & 忘记密码行 ==========
 .rem-row {
   display: flex;
@@ -315,7 +320,9 @@ const goToRegister = () => {
 .login-btn {
   font-size: 1.2rem;
   height: 60px;
-  width: 90%;
+  width: 60%;
+  display: block;
+  margin: 0 auto;
   border-radius: 50px;
   font-weight: 600;
   letter-spacing: 2px;
