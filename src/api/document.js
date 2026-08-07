@@ -1,32 +1,9 @@
-import axios from 'axios'
-
-const BASE_URL = '/api'
-
-const request = axios.create({
-  baseURL: BASE_URL,
-  timeout: 10000
-})
-
-request.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-    return config
-  },
-  error => Promise.reject(error)
-)
-
-request.interceptors.response.use(
-  response => response.data,
-  error => Promise.reject(error)
-)
+import request from '@/utils/request'
 
 export const documentApi = {
   upload(formData) {
     return request.post('/document/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 
@@ -44,7 +21,7 @@ export const documentApi = {
 
   async downloadById(id, fileName) {
     const blob = await request.get(`/document/download/${id}`, {
-      responseType: 'blob'
+      responseType: 'blob',
     })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -54,5 +31,5 @@ export const documentApi = {
     a.click()
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
-  }
+  },
 }

@@ -99,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -116,11 +116,13 @@ import {
   Edit,
   Delete
 } from '@element-plus/icons-vue'
-import { userApi } from '../api/user'
-import { chatMemoryApi } from '../api/chatMemory'
+import { useUserStore } from '@/stores/user'
+import { logout } from '@/api/user'
+import { chatMemoryApi } from '@/api/chatMemory'
 
 const router = useRouter()
-const userInfo = ref(null)
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.userInfo)
 const sessions = ref([])
 const loadingSessions = ref(false)
 const creatingNew = ref(false)
@@ -199,20 +201,6 @@ const navigateTo = (path) => {
   router.push(path)
 }
 
-const loadUserInfo = async () => {
-  const token = localStorage.getItem('token')
-  if (!token) return
-
-  try {
-    const res = await userApi.getUserInfo()
-    if (res.code === 200) {
-      userInfo.value = res.data
-    }
-  } catch (error) {
-    console.error('获取用户信息失败', error)
-  }
-}
-
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -222,11 +210,11 @@ const handleLogout = async () => {
     })
 
     try {
-      await userApi.logout()
+      await logout()
     } catch (error) {
       console.error('登出请求失败', error)
     } finally {
-      localStorage.removeItem('token')
+      userStore.logout()
       ElMessage.success('已退出登录')
       router.push('/login')
     }
@@ -250,7 +238,6 @@ const formatTime = (timeStr) => {
 }
 
 onMounted(() => {
-  loadUserInfo()
   loadSessions()
 })
 </script>

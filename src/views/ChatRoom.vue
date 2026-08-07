@@ -199,13 +199,16 @@ import {
   SwitchButton,
   Upload
 } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 import { aiApi } from '@/api/ai'
 import { chatMemoryApi } from '@/api/chatMemory'
 import { documentApi } from '@/api/document'
-import { userApi } from '@/api/user'
+import { logout } from '@/api/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.userInfo)
 
 // Chat mode: 'chat' or 'agent'
 const chatMode = ref('chat')
@@ -236,9 +239,6 @@ const uploading = ref(false)
 const filteredDocs = computed(() => {
   return searchResults.value !== null ? searchResults.value : docs.value
 })
-
-// User info
-const userInfo = ref(null)
 
 const getCurrentTime = () => {
   const now = new Date()
@@ -333,8 +333,6 @@ const formatContent = (content) => {
 
 // Session sidebar methods
 const loadSessions = async () => {
-  const token = localStorage.getItem('token')
-  if (!token) return
   loadingSessions.value = true
   try {
     const res = await chatMemoryApi.getAllConversationsSummary()
@@ -516,21 +514,6 @@ watch(activeSidebarTab, (newTab) => {
   }
 })
 
-// User info
-const loadUserInfo = async () => {
-  const token = localStorage.getItem('token')
-  if (!token) return
-
-  try {
-    const res = await userApi.getUserInfo()
-    if (res.code === 200) {
-      userInfo.value = res.data
-    }
-  } catch (error) {
-    console.error('获取用户信息失败', error)
-  }
-}
-
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -540,11 +523,11 @@ const handleLogout = async () => {
     })
 
     try {
-      await userApi.logout()
+      await logout()
     } catch (error) {
       console.error('登出请求失败', error)
     } finally {
-      localStorage.removeItem('token')
+      userStore.logout()
       ElMessage.success('已退出登录')
       router.push('/login')
     }
@@ -568,12 +551,6 @@ const formatTime = (timeStr) => {
 }
 
 onMounted(async () => {
-  const token = localStorage.getItem('token')
-  if (!token) {
-    router.replace('/login')
-    return
-  }
-  loadUserInfo()
   await loadSessions()
 
   if (route.query.conversationId) {

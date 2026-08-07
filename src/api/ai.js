@@ -1,15 +1,18 @@
+import { useUserStore } from '@/stores/user'
+
 const BASE_URL = '/api'
 
 const getToken = () => {
-  return localStorage.getItem('token') || ''
+  const userStore = useUserStore()
+  return userStore.token || ''
 }
 
 const sseFetch = (url) => {
   const token = getToken()
   return fetch(url, {
     headers: {
-      'Authorization': `Bearer ${token}`
-    }
+      Authorization: `Bearer ${token}`,
+    },
   })
 }
 
@@ -45,7 +48,7 @@ const createSseStream = (url) => {
         }
         controller.close()
       }
-    }
+    },
   })
 }
 
@@ -58,5 +61,5 @@ export const aiApi = {
   doChatWithManus(message, chatId) {
     const url = `${BASE_URL}/ai/manus/chat?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`
     return createSseStream(url)
-  }
+  },
 }

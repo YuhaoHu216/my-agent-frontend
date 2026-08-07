@@ -1,20 +1,43 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { injectRouter } from '@/utils/request'
 
 const routes = [
+  {
+    path: '/',
+    redirect: '/home',
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: () => import('../views/Home.vue'),
+    meta: { title: '应用中心', auth: true },
+  },
   {
     path: '/chat-room',
     name: 'ChatRoom',
     component: () => import('../views/ChatRoom.vue'),
+    meta: { title: 'AI 助手', auth: true },
+  },
+  {
+    path: '/manus-chat',
+    redirect: '/chat-room',
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
+    meta: { title: '登录' },
   },
   {
     path: '/register',
     name: 'Register',
     component: () => import('../views/Register.vue'),
+    meta: { title: '注册' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/home',
   },
 ]
 
@@ -23,31 +46,42 @@ const router = createRouter({
   routes,
 })
 
-const WHITE_LIST = ['/login', '/register']
+// 将 router 注入 request.js，使 401 拦截器能跳转登录页
+injectRouter(router)
 
-router.beforeEach((to, from) => {
-  const token = localStorage.getItem('token')
+// 路由守卫
+router.beforeEach(async (to, from, next) => {
+  // 设置页面标题
+  document.title = to.meta.title ? `${to.meta.title} - My Agent` : 'My Agent'
 
-  // 白名单路由直接放行
-  if (WHITE_LIST.includes(to.path)) {
-    return true
-  }
+  const userStore = useUserStore()
 
-  // 无 token：重定向到登录页，携带目标路径用于登录后回跳
-  if (!token) {
-    return {
-      path: '/login',
-      query: { redirect: to.fullPath },
+  // 有 token 但无 userInfo，先获取用户信息（无论目标页面是否需要认证）
+  if (userStore.token && !userStore.userInfo) {
+    try {
+      await userStore.fetchUserInfo()
+    } catch {
+      userStore.logout()
+      // 仅当目标页面需要认证时才拦截跳转登录页
+      if (to.meta.auth) {
+        return next({ path: '/login', query: { redirect: to.fullPath } })
+      }
     }
   }
 
-  // 有 token 但访问根路径：重定向到 chat-room
-  if (to.path === '/') {
-    return '/chat-room'
+  // 需要认证的页面：检查 token
+  if (to.meta.auth) {
+    if (!userStore.token) {
+      return next({ path: '/login', query: { redirect: to.fullPath } })
+    }
   }
 
-  // 有 token 访问受保护路由：放行
-  return true
+  // 已登录用户访问登录/注册页 → 跳首页
+  if ((to.name === 'Login' || to.name === 'Register') && userStore.token) {
+    return next({ path: '/home' })
+  }
+
+  next()
 })
 
 export default router

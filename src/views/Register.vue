@@ -97,7 +97,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userApi } from '../api/user'
+import { register } from '@/api/user'
 
 const router = useRouter()
 const registerFormRef = ref(null)
@@ -172,7 +172,7 @@ const handleRegister = async () => {
     if (valid) {
       loading.value = true
       try {
-        const res = await userApi.register(registerForm)
+        const res = await register(registerForm)
         if (res.code === 200) {
           ElMessage.success('注册成功')
           router.push('/login')

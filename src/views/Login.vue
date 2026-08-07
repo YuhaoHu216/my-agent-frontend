@@ -76,10 +76,12 @@
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userApi } from '../api/user'
+import { useUserStore } from '@/stores/user'
+import { login } from '@/api/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const loginFormRef = ref(null)
 const loading = ref(false)
 const rememberMe = ref(false)
@@ -105,17 +107,14 @@ const handleLogin = async () => {
     if (valid) {
       loading.value = true
       try {
-        const res = await userApi.login(loginForm)
-        if (res.code === 200) {
-          localStorage.setItem('token', res.data)
-          ElMessage.success('登录成功')
-          const redirect = route.query.redirect
-          router.push(redirect || '/chat-room')
-        } else {
-          ElMessage.error(res.message || '登录失败')
-        }
-      } catch (error) {
-        ElMessage.error(error.response?.data?.message || '登录失败')
+        const res = await login(loginForm)
+        userStore.setToken(res.data)
+        await userStore.fetchUserInfo()
+        ElMessage.success('登录成功')
+        const redirect = route.query.redirect
+        router.push(redirect || '/home')
+      } catch {
+        // 错误已在拦截器处理
       } finally {
         loading.value = false
       }

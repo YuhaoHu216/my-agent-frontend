@@ -1,33 +1,4 @@
-import axios from 'axios'
-
-const BASE_URL = '/api'
-
-const request = axios.create({
-  baseURL: BASE_URL,
-  timeout: 10000
-})
-
-request.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-    return config
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
-
-request.interceptors.response.use(
-  response => {
-    return response.data
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
+import request from '@/utils/request'
 
 export const chatMemoryApi = {
   newConversationId() {
@@ -52,7 +23,7 @@ export const chatMemoryApi = {
 
   updateConversationName(conversationId, name) {
     return request.put(`/chat-memory/conversations/${conversationId}/name`, null, {
-      params: { name }
+      params: { name },
     })
-  }
+  },
 }
