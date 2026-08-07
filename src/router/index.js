@@ -5,13 +5,11 @@ import { injectRouter } from '@/utils/request'
 const routes = [
   {
     path: '/',
-    redirect: '/home',
+    redirect: '/chat-room',
   },
   {
     path: '/home',
-    name: 'Home',
-    component: () => import('../views/Home.vue'),
-    meta: { title: '应用中心', auth: true },
+    redirect: '/chat-room',
   },
   {
     path: '/chat-room',
@@ -37,7 +35,7 @@ const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/home',
+    redirect: '/chat-room',
   },
 ]
 
@@ -76,9 +74,9 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // 已登录用户访问登录/注册页 → 跳首页
+  // 已登录用户访问登录/注册页 → 跳聊天页
   if ((to.name === 'Login' || to.name === 'Register') && userStore.token) {
-    return next({ path: '/home' })
+    return next({ path: '/chat-room' })
   }
 
   next()
