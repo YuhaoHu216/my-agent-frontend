@@ -36,7 +36,14 @@ const createSseStream = (url) => {
 
           for (const line of lines) {
             if (line.startsWith('data:')) {
-              controller.enqueue(line.slice(5).replace(/^ /, ''))
+              const raw = line.slice(5).replace(/^ /, '')
+              // 尝试解析 JSON，成功则为结构化事件，失败则作为纯文本（向后兼容）
+              try {
+                const event = JSON.parse(raw)
+                controller.enqueue(event)
+              } catch {
+                controller.enqueue(raw)
+              }
             }
           }
         }
