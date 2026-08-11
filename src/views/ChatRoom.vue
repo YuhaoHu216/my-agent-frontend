@@ -288,6 +288,11 @@ const getCurrentTime = () => {
   return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+const formatTimestamp = (ts) => {
+  if (!ts) return ''
+  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -484,7 +489,7 @@ const enterSession = async (id) => {
       messages.value = res.data.map(msg => ({
         role: msg.role === 'USER' ? 'user' : 'ai',
         content: msg.text || '',
-        time: ''
+        time: formatTimestamp(msg.timestamp)
       }))
       await scrollToBottom()
     }
@@ -667,7 +672,7 @@ onMounted(async () => {
         messages.value = res.data.map(msg => ({
           role: msg.role === 'USER' ? 'user' : 'ai',
           content: msg.text || '',
-          time: ''
+          time: formatTimestamp(msg.timestamp)
         }))
         await scrollToBottom()
       }
