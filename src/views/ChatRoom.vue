@@ -92,7 +92,7 @@
             <el-radio-button value="agent">Agent 模式</el-radio-button>
           </el-radio-group>
         </div>
-        <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 超级智能体' }}</span>
+        <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
         <div class="header-right">
           <div class="user-info" v-if="userInfo">
             <el-dropdown trigger="click">
@@ -134,9 +134,49 @@
             <div class="message-bubble">
               <template v-if="message.content">
                 <template v-if="chatMode === 'agent' && message.role === 'ai'">
-                  <div v-for="(line, idx) in formatContent(message.content)" :key="idx" class="message-line">
-                    {{ line }}
-                  </div>
+                  <!-- 新格式：结构化事件展示 -->
+                  <template v-if="message.events && message.events.length > 0">
+                    <div v-for="(stepEvents, stepIdx) in groupedEvents(message.events)" :key="stepIdx" class="step-block">
+                      <!-- 思考过程 - 可折叠面板（包含工具调用和结果） -->
+                      <div v-if="hasThinkOrToolEvents(stepEvents)" class="think-event">
+                        <el-collapse v-model="activeThinkingPanels" class="think-collapse">
+                          <el-collapse-item :name="'step-'+getStepNumber(stepEvents)">
+                            <template #title>
+                              <el-icon class="think-icon"><Loading v-if="getStepNumber(stepEvents) === message.currentStep && isSending" /></el-icon>
+                              第 {{ getStepNumber(stepEvents) }} 步思考过程
+                            </template>
+                            <!-- 思考内容 -->
+                            <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'think')" :key="'think-'+stepIdx+'-'+eIdx" class="thinking-content">{{ event.content }}</div>
+                            <!-- 工具调用信息 -->
+                            <div v-if="hasToolEvents(stepEvents)" class="tool-section">
+                              <div class="tool-section-divider">— 工具调用 —</div>
+                              <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_call')" :key="'toolcall-'+stepIdx+'-'+eIdx" class="tool-call-info">
+                                <el-tag size="small" type="info" class="tool-call-tag">调用工具</el-tag>
+                                <span class="tool-call-detail">{{ formatToolCalls(event.content) }}</span>
+                              </div>
+                              <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_result')" :key="'result-'+stepIdx+'-'+eIdx" class="tool-result">
+                                <div class="tool-result-text">{{ event.content }}</div>
+                              </div>
+                            </div>
+                          </el-collapse-item>
+                        </el-collapse>
+                      </div>
+                      <!-- 最终回答 -->
+                      <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'finish')" :key="'finish-'+stepIdx+'-'+eIdx" class="finish-answer">
+                        {{ event.content }}
+                      </div>
+                      <!-- 错误提示 -->
+                      <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'error' || e.type === 'max_steps')" :key="'warn-'+stepIdx+'-'+eIdx">
+                        <el-alert :title="event.content" type="warning" :closable="false" show-icon />
+                      </div>
+                    </div>
+                  </template>
+                  <!-- 旧格式：纯文本回退（向后兼容） -->
+                  <template v-else>
+                    <div v-for="(line, idx) in formatContent(message.content)" :key="idx" class="message-line">
+                      {{ line }}
+                    </div>
+                  </template>
                 </template>
                 <template v-else>
                   {{ message.content }}
@@ -197,7 +237,8 @@ import {
   Phone,
   Calendar,
   SwitchButton,
-  Upload
+  Upload,
+  Loading
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { aiApi } from '@/api/ai'
@@ -218,6 +259,8 @@ const isLoading = ref(false)
 const isSending = ref(false)
 const chatId = ref('')
 const messagesContainer = ref(null)
+// Agent 模式下当前正在思考的面板（默认展开当前步骤的思考）
+const activeThinkingPanels = ref([])
 
 // Session sidebar
 const sessions = ref([])
@@ -286,7 +329,28 @@ const sendMessage = async () => {
       const { done, value } = await reader.read()
       if (done) break
 
-      messages.value[aiMessageIndex].content += value
+      // Agent 模式：检测结构化事件
+      if (chatMode.value === 'agent' && typeof value === 'object' && value.type) {
+        // 过滤掉 step_start / step_end 标记事件，它们只用于后端流程控制
+        if (value.type === 'step_start' || value.type === 'step_end') {
+          await scrollToBottom()
+          continue
+        }
+
+        const aiMsg = messages.value[aiMessageIndex]
+        if (!aiMsg.events) aiMsg.events = []
+        aiMsg.events.push(value)
+        aiMsg.currentStep = value.step
+
+        // 同时拼接 content 用于向后兼容的文本展示和历史消息恢复
+        const labelMap = { think: '[思考]', tool_call: '[工具调用]', tool_result: '[工具结果]', finish: '[最终回答]' }
+        const label = labelMap[value.type] || ''
+        aiMsg.content += (label ? label + ' ' : '') + value.content + '\n'
+      } else {
+        // Chat 模式或旧格式纯文本
+        messages.value[aiMessageIndex].content += value
+      }
+
       await scrollToBottom()
     }
   } catch (error) {
@@ -329,6 +393,47 @@ const formatContent = (content) => {
   }
 
   return result
+}
+
+// 按 step 编号分组事件
+const groupedEvents = (events) => {
+  if (!events || !events.length) return []
+  const groups = {}
+  for (const e of events) {
+    const key = e.step || 0
+    if (!groups[key]) groups[key] = []
+    groups[key].push(e)
+  }
+  return Object.values(groups)
+}
+
+// 格式化工具调用 JSON 为可读文本
+const formatToolCalls = (content) => {
+  try {
+    const calls = JSON.parse(content)
+    if (Array.isArray(calls)) {
+      return calls.map(c => `${c.name}(${c.arguments})`).join('；')
+    }
+  } catch {
+    // 非 JSON 格式，直接返回
+  }
+  return content
+}
+
+// 判断步骤中是否包含工具相关事件
+const hasToolEvents = (stepEvents) => {
+  return stepEvents.some(e => e.type === 'tool_call' || e.type === 'tool_result')
+}
+
+// 判断步骤中是否有思考或工具事件
+const hasThinkOrToolEvents = (stepEvents) => {
+  return stepEvents.some(e => e.type === 'think' || e.type === 'tool_call' || e.type === 'tool_result')
+}
+
+// 获取步骤编号
+const getStepNumber = (stepEvents) => {
+  if (!stepEvents || !stepEvents.length) return 0
+  return stepEvents[0].step || 0
 }
 
 // Session sidebar methods
@@ -889,6 +994,107 @@ onMounted(async () => {
           &:last-child {
             margin-bottom: 0;
           }
+        }
+
+        // Agent 模式结构化事件样式
+        .step-block {
+          margin-bottom: 4px;
+
+          &:last-child {
+            margin-bottom: 0;
+          }
+        }
+
+        .think-event {
+          .think-collapse {
+            border: none;
+            background: transparent;
+
+            :deep(.el-collapse-item__header) {
+              font-size: 13px;
+              color: #909399;
+              height: 32px;
+              line-height: 32px;
+              border: none;
+              background: transparent;
+              padding: 0 4px;
+            }
+
+            :deep(.el-collapse-item__wrap) {
+              border: none;
+              background: #fafafa;
+              border-radius: 8px;
+              margin: 4px 0;
+            }
+
+            :deep(.el-collapse-item__content) {
+              padding: 10px 14px;
+              font-size: 13px;
+              color: #666;
+              line-height: 1.7;
+              white-space: pre-wrap;
+              word-break: break-word;
+            }
+          }
+
+          .think-icon {
+            margin-right: 6px;
+            font-size: 14px;
+          }
+
+          // 折叠面板内的工具调用区域
+          .tool-section {
+            margin-top: 10px;
+
+            .tool-section-divider {
+              text-align: center;
+              font-size: 12px;
+              color: #c0c4cc;
+              margin-bottom: 8px;
+            }
+          }
+        }
+
+        .thinking-content {
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+
+        .tool-call-info {
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          padding: 4px 0;
+
+          .tool-call-tag {
+            flex-shrink: 0;
+          }
+
+          .tool-call-detail {
+            font-size: 13px;
+            color: #606266;
+            line-height: 1.5;
+            word-break: break-all;
+          }
+        }
+
+        .tool-result {
+          .tool-result-text {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+        }
+
+        .finish-answer {
+          font-size: 14px;
+          color: #333;
+          line-height: 1.6;
+          white-space: pre-wrap;
+          word-break: break-word;
+          padding-top: 4px;
         }
       }
 

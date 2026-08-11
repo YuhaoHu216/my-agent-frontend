@@ -18,10 +18,6 @@ const routes = [
     meta: { title: 'AI 助手', auth: true },
   },
   {
-    path: '/manus-chat',
-    redirect: '/chat-room',
-  },
-  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
