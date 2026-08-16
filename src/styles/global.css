@@ -7,3 +7,78 @@ body,
   height: 100%;
   overflow: hidden;
 }
+
+/* ========== 弹层深色化（ElMessage / ElMessageBox 全局挂载于 body） ========== */
+
+/* 消息提示 toast */
+.el-message--success,
+.el-message--warning,
+.el-message--info,
+.el-message--error {
+  background: rgba(20, 27, 42, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.el-message .el-message__content {
+  color: #f4f7fb !important;
+}
+
+/* 对话框（重命名 / 退出登录确认） */
+.el-message-box {
+  background: rgba(20, 27, 42, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.el-message-box__title {
+  color: #f4f7fb;
+}
+
+.el-message-box__message {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.el-message-box__headerbtn .el-message-box__close {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.el-message-box__input .el-input__wrapper {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16) inset;
+}
+
+.el-message-box__input .el-input__inner {
+  color: #f4f7fb;
+}
+
+.el-message-box__input .el-input__inner::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.el-message-box__btns .el-button--primary {
+  background: #2dd4bf;
+  border-color: #2dd4bf;
+  color: #0c2230;
+}
+
+.el-message-box__btns .el-button--primary:hover {
+  background: #5eead4;
+  border-color: #5eead4;
+  color: #0c2230;
+}
+
+.el-message-box__btns .el-button:not(.el-button--primary) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.el-message-box__btns .el-button:not(.el-button--primary):hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}

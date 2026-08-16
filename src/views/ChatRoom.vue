@@ -26,6 +26,7 @@
                   title="确定要删除该会话吗？"
                   confirm-button-text="删除"
                   cancel-button-text="取消"
+                  popper-class="glass-popper"
                   @confirm="handleDelete(session.id)"
                 >
                   <template #reference>
@@ -68,6 +69,7 @@
                   title="确定要删除该文档吗？"
                   confirm-button-text="删除"
                   cancel-button-text="取消"
+                  popper-class="glass-popper"
                   @confirm="handleDocDelete(doc.id)"
                 >
                   <template #reference>
@@ -95,7 +97,7 @@
         <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
         <div class="header-right">
           <div class="user-info" v-if="userInfo">
-            <el-dropdown trigger="click">
+            <el-dropdown trigger="click" popper-class="glass-popper">
               <div class="user-avatar">
                 <el-avatar :size="32" :icon="UserFilled" />
                 <span class="username">{{ userInfo.username }}</span>
@@ -686,51 +688,118 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+// ========== 玻璃态主题变量 ==========
 .chat-layout {
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --text-primary: #f4f7fb;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.38);
+  --accent: #5eead4;
+  --accent-deep: #2dd4bf;
+
+  position: relative;
   display: flex;
   height: 100vh;
+  background-image: url('@/assets/back.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  font-family: 'Poppins', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+
+  // 深色遮罩层，让玻璃面板与白色文字清晰可读
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgba(12, 18, 30, 0.72);
+    pointer-events: none;
+  }
+}
+
+// ---- 自定义滚动条 ----
+.sidebar,
+.session-list,
+.doc-list,
+.chat-messages {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 // ---- Sidebar ----
 .sidebar {
+  position: relative;
+  z-index: 1;
   width: 280px;
   flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #e8e8e8;
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
+  color: var(--text-primary);
 
   .sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #f0f0f0;
+    padding: 20px 18px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 
     h2 {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
-      color: #333;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
       margin: 0;
+    }
+
+    :deep(.el-button) {
+      background: var(--glass-bg-strong);
+      border-color: var(--glass-border);
+      color: #fff;
+      border-radius: 10px;
+      transition: all 0.25s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.22);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
     }
   }
 
   .session-list {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 0;
+    padding: 6px 0;
   }
 
   .session-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
+    margin: 2px 10px;
+    padding: 11px 12px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s ease;
 
     &:hover {
-      background-color: #f5f5f5;
+      background-color: rgba(255, 255, 255, 0.08);
 
       .session-actions {
         opacity: 1;
@@ -738,14 +807,18 @@ onMounted(async () => {
     }
 
     &.active {
-      background-color: #e6f7ff;
-      border-right: 3px solid #409eff;
+      background: linear-gradient(135deg, rgba(94, 234, 212, 0.22), rgba(45, 212, 191, 0.1));
+      box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.35);
+
+      .session-name {
+        color: #fff;
+      }
     }
 
     .session-name {
       flex: 1;
       font-size: 14px;
-      color: #333;
+      color: var(--text-primary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -756,8 +829,16 @@ onMounted(async () => {
       transition: opacity 0.2s;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 2px;
       flex-shrink: 0;
+
+      :deep(.el-button) {
+        color: var(--text-secondary);
+
+        &:hover {
+          color: #fff;
+        }
+      }
     }
   }
 }
@@ -769,7 +850,25 @@ onMounted(async () => {
 
   :deep(.el-tabs__header) {
     margin: 0;
-    padding: 0 16px;
+    padding: 6px 16px 0;
+  }
+
+  :deep(.el-tabs__nav-wrap::after) {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  :deep(.el-tabs__item) {
+    color: var(--text-secondary);
+    font-size: 14px;
+
+    &.is-active {
+      color: #fff;
+    }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background: var(--accent);
   }
 
   :deep(.el-tabs__content) {
@@ -789,15 +888,51 @@ onMounted(async () => {
 .doc-search-bar {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 14px 16px 6px;
 
-  .el-input {
-    flex: 1;
+  :deep(.el-input__wrapper) {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+
+    .el-input__inner {
+      color: var(--text-primary);
+
+      &::placeholder {
+        color: var(--text-tertiary);
+      }
+    }
+  }
+
+  :deep(.el-button) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0c2230;
+    border-radius: 10px;
+
+    &:hover {
+      background: #7ff0dd;
+      border-color: #7ff0dd;
+    }
   }
 }
 
 .doc-upload-bar {
-  padding: 0 16px 8px;
+  padding: 6px 16px 8px;
+
+  :deep(.el-button) {
+    background: transparent;
+    border-color: var(--glass-border);
+    color: var(--text-primary);
+    border-radius: 10px;
+    transition: all 0.25s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+  }
 }
 
 .doc-list {
@@ -809,12 +944,14 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
+    margin: 2px 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s ease;
 
     &:hover {
-      background-color: #f5f5f5;
+      background-color: rgba(255, 255, 255, 0.08);
 
       .doc-actions {
         opacity: 1;
@@ -822,14 +959,18 @@ onMounted(async () => {
     }
 
     &.active {
-      background-color: #e6f7ff;
-      border-right: 3px solid #409eff;
+      background: linear-gradient(135deg, rgba(94, 234, 212, 0.22), rgba(45, 212, 191, 0.1));
+      box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.35);
+
+      .doc-name {
+        color: #fff;
+      }
     }
 
     .doc-name {
       flex: 1;
       font-size: 13px;
-      color: #333;
+      color: var(--text-primary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -840,41 +981,78 @@ onMounted(async () => {
       transition: opacity 0.2s;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 2px;
       flex-shrink: 0;
+
+      :deep(.el-button) {
+        color: var(--text-secondary);
+
+        &:hover {
+          color: #fff;
+        }
+      }
     }
   }
 }
 
+:deep(.el-empty__description p) {
+  color: var(--text-tertiary);
+}
+
 // ---- Main area ----
 .main-area {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background-color: #f5f5f5;
 }
 
 // ---- Header ----
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
-  background-color: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 12px 24px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--glass-border);
   gap: 16px;
 
   .header-left {
     flex-shrink: 0;
+
+    :deep(.el-radio-button__inner) {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      transition: all 0.25s ease;
+    }
+
+    :deep(.el-radio-button:first-child .el-radio-button__inner) {
+      border-radius: 10px 0 0 10px;
+    }
+
+    :deep(.el-radio-button:last-child .el-radio-button__inner) {
+      border-radius: 0 10px 10px 0;
+    }
+
+    :deep(.el-radio-button.is-active .el-radio-button__inner) {
+      background: rgba(255, 255, 255, 0.95);
+      color: #0f1c2b;
+      border-color: transparent;
+      box-shadow: none;
+    }
   }
 
   .chat-title {
     flex: 1;
     text-align: center;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
-    color: #333;
+    letter-spacing: 1px;
+    color: var(--text-primary);
   }
 
   .header-right {
@@ -886,23 +1064,28 @@ onMounted(async () => {
         align-items: center;
         gap: 8px;
         cursor: pointer;
-        padding: 4px 12px;
+        padding: 4px 10px;
         border-radius: 20px;
         transition: all 0.3s ease;
 
         &:hover {
-          background-color: #f0f0f0;
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        :deep(.el-avatar) {
+          background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+          color: #0c2230;
         }
 
         .username {
           font-size: 14px;
           font-weight: 500;
-          color: #333;
+          color: var(--text-primary);
         }
       }
 
       .user-detail {
-        padding: 8px 0;
+        padding: 4px 0;
 
         p {
           margin: 8px 0;
@@ -910,10 +1093,10 @@ onMounted(async () => {
           align-items: center;
           gap: 8px;
           font-size: 14px;
-          color: #666;
+          color: var(--text-secondary);
 
           .el-icon {
-            color: #409eff;
+            color: var(--accent);
           }
         }
       }
@@ -925,11 +1108,12 @@ onMounted(async () => {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 28px 20px;
 
   .message {
     display: flex;
     margin-bottom: 20px;
+    animation: messageIn 0.35s ease both;
 
     &.user {
       flex-direction: row-reverse;
@@ -938,22 +1122,16 @@ onMounted(async () => {
         align-items: flex-end;
 
         .message-bubble {
-          border-radius: 16px 16px 0 16px;
+          background: rgba(255, 255, 255, 0.95);
+          color: #1e2a3a;
+          border-radius: 18px 18px 4px 18px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         }
 
         .message-time {
           text-align: right;
+          color: rgba(255, 255, 255, 0.45);
         }
-      }
-
-      &.chat .message-bubble {
-        background-color: #409eff;
-        color: #fff;
-      }
-
-      &.agent .message-bubble {
-        background-color: #67c23a;
-        color: #fff;
       }
     }
 
@@ -962,9 +1140,17 @@ onMounted(async () => {
         align-items: flex-start;
 
         .message-bubble {
-          background-color: #fff;
-          color: #333;
-          border-radius: 16px 16px 16px 0;
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: var(--text-primary);
+          border-radius: 18px 18px 18px 4px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        .message-time {
+          color: rgba(255, 255, 255, 0.45);
         }
       }
     }
@@ -972,22 +1158,36 @@ onMounted(async () => {
     .message-avatar {
       flex-shrink: 0;
       margin: 0 10px;
+
+      :deep(.el-avatar) {
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      }
+    }
+
+    &.user .message-avatar :deep(.el-avatar) {
+      background: #fff;
+      color: #0f1c2b;
+    }
+
+    &.ai .message-avatar :deep(.el-avatar) {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: #0c2230;
     }
 
     .message-content {
       display: flex;
       flex-direction: column;
-      max-width: 70%;
+      max-width: 72%;
 
       .message-bubble {
         padding: 12px 16px;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.65;
         word-wrap: break-word;
 
         // Agent 模式结构化事件样式
         .step-block {
-          margin-bottom: 4px;
+          margin-bottom: 6px;
 
           &:last-child {
             margin-bottom: 0;
@@ -1001,7 +1201,7 @@ onMounted(async () => {
 
             :deep(.el-collapse-item__header) {
               font-size: 13px;
-              color: #909399;
+              color: var(--text-secondary);
               height: 32px;
               line-height: 32px;
               border: none;
@@ -1011,7 +1211,7 @@ onMounted(async () => {
 
             :deep(.el-collapse-item__wrap) {
               border: none;
-              background: #fafafa;
+              background: rgba(0, 0, 0, 0.2);
               border-radius: 8px;
               margin: 4px 0;
             }
@@ -1019,7 +1219,7 @@ onMounted(async () => {
             :deep(.el-collapse-item__content) {
               padding: 10px 14px;
               font-size: 13px;
-              color: #666;
+              color: rgba(255, 255, 255, 0.75);
               line-height: 1.7;
               white-space: pre-wrap;
               word-break: break-word;
@@ -1031,14 +1231,13 @@ onMounted(async () => {
             font-size: 14px;
           }
 
-          // 折叠面板内的工具调用区域
           .tool-section {
             margin-top: 10px;
 
             .tool-section-divider {
               text-align: center;
               font-size: 12px;
-              color: #c0c4cc;
+              color: var(--text-tertiary);
               margin-bottom: 8px;
             }
           }
@@ -1057,11 +1256,14 @@ onMounted(async () => {
 
           .tool-call-tag {
             flex-shrink: 0;
+            background: rgba(94, 234, 212, 0.16);
+            border-color: rgba(94, 234, 212, 0.4);
+            color: var(--accent);
           }
 
           .tool-call-detail {
             font-size: 13px;
-            color: #606266;
+            color: rgba(255, 255, 255, 0.75);
             line-height: 1.5;
             word-break: break-all;
           }
@@ -1070,7 +1272,7 @@ onMounted(async () => {
         .tool-result {
           .tool-result-text {
             font-size: 14px;
-            color: #333;
+            color: rgba(255, 255, 255, 0.85);
             line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-word;
@@ -1080,14 +1282,41 @@ onMounted(async () => {
         .finish-answer {
           padding-top: 4px;
         }
+
+        :deep(.el-alert) {
+          border-radius: 8px;
+
+          &.el-alert--warning {
+            background: rgba(250, 173, 20, 0.12);
+            border: 1px solid rgba(250, 173, 20, 0.3);
+
+            .el-alert__title {
+              color: #fcd34d;
+            }
+
+            .el-alert__icon {
+              color: #fbbf24;
+            }
+          }
+        }
       }
 
       .message-time {
         font-size: 12px;
-        color: #999;
-        margin-top: 4px;
+        margin-top: 5px;
       }
     }
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1095,11 +1324,11 @@ onMounted(async () => {
 .typing {
   display: flex;
   gap: 4px;
-  padding: 16px;
+  padding: 8px 2px;
 
   .dot {
     animation: typing 1.4s infinite;
-    font-size: 20px;
+    font-size: 22px;
     line-height: 1;
   }
 
@@ -1115,19 +1344,21 @@ onMounted(async () => {
 @keyframes typing {
   0%, 60%, 100% {
     transform: translateY(0);
-    opacity: 0.4;
+    opacity: 0.35;
   }
   30% {
-    transform: translateY(-10px);
+    transform: translateY(-8px);
     opacity: 1;
   }
 }
 
 // ---- Input ----
 .chat-input {
-  padding: 20px;
-  background-color: #fff;
-  border-top: 1px solid #e0e0e0;
+  padding: 16px 20px 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--glass-border);
 
   .input-wrapper {
     position: relative;
@@ -1136,14 +1367,15 @@ onMounted(async () => {
     display: flex;
     align-items: flex-end;
     gap: 12px;
-    background-color: #f7f7f8;
-    border-radius: 16px;
-    padding: 12px 16px;
-    border: 1px solid #e5e5e5;
-    transition: border-color 0.2s;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 12px 12px 12px 18px;
+    border: 1px solid var(--glass-border);
+    transition: border-color 0.2s, box-shadow 0.2s;
 
     &:focus-within {
-      border-color: #10a37f;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.16);
     }
 
     .message-textarea {
@@ -1158,36 +1390,113 @@ onMounted(async () => {
         line-height: 1.5;
         max-height: 200px;
         resize: none;
+        color: var(--text-primary);
+        caret-color: var(--accent);
 
         &::placeholder {
-          color: #8e8ea0;
+          color: var(--text-tertiary);
         }
       }
     }
 
     .send-button {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background-color: #10a37f;
-      border: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep)) !important;
+      border: none !important;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       transition: all 0.2s;
 
-      &:hover {
-        background-color: #0e8b6d;
+      .el-icon {
+        font-size: 18px;
+        color: #0c2230;
+      }
+
+      &:hover:not(.is-disabled) {
+        background: linear-gradient(135deg, #7ff0dd, #34d6bf) !important;
+        filter: brightness(1.05);
+        box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4);
       }
 
       &:disabled {
-        background-color: #d1d5db;
+        background: rgba(255, 255, 255, 0.12) !important;
         cursor: not-allowed;
-      }
 
-      .el-icon {
-        font-size: 18px;
+        .el-icon {
+          color: var(--text-tertiary);
+        }
+      }
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+// popper 挂载在 body，需全局样式；用特定 class 限定，避免污染其他页面
+.glass-popper.el-popper {
+  background: rgba(20, 27, 42, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: #f4f7fb;
+
+  .el-popper__arrow::before {
+    background: rgba(20, 27, 42, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+}
+
+.glass-popper .el-dropdown-menu {
+  background: transparent;
+  padding: 6px;
+
+  .el-dropdown-menu__item {
+    color: rgba(255, 255, 255, 0.85);
+
+    &:hover,
+    &:focus {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+
+  .el-dropdown-menu__item--divided {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+}
+
+.glass-popper.el-popconfirm {
+  .el-popconfirm__main {
+    color: #f4f7fb;
+  }
+
+  .el-button {
+    border-radius: 9px;
+
+    &.el-button--primary {
+      background: #2dd4bf;
+      border-color: #2dd4bf;
+      color: #0c2230;
+
+      &:hover {
+        background: #5eead4;
+        border-color: #5eead4;
+      }
+    }
+
+    &:not(.el-button--primary) {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.85);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.16);
         color: #fff;
       }
     }
