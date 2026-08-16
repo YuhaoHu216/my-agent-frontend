@@ -161,9 +161,9 @@
                           </el-collapse-item>
                         </el-collapse>
                       </div>
-                      <!-- 最终回答 -->
-                      <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'finish')" :key="'finish-'+stepIdx+'-'+eIdx" class="finish-answer">
-                        {{ event.content }}
+                      <!-- 最终回答（finish 完整文本，或 answer 流式分块累积） -->
+                      <div v-if="getAnswerText(stepEvents)" class="finish-answer">
+                        {{ getAnswerText(stepEvents) }}
                       </div>
                       <!-- 错误提示 -->
                       <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'error' || e.type === 'max_steps')" :key="'warn-'+stepIdx+'-'+eIdx">
@@ -347,6 +347,12 @@ const sendMessage = async () => {
         aiMsg.events.push(value)
         aiMsg.currentStep = value.step
 
+        // answer 是最终回答的流式分块，完整文本会由 finish 事件携带，故不重复拼接到 content
+        if (value.type === 'answer') {
+          await scrollToBottom()
+          continue
+        }
+
         // 同时拼接 content 用于向后兼容的文本展示和历史消息恢复
         const labelMap = { think: '[思考]', tool_call: '[工具调用]', tool_result: '[工具结果]', finish: '[最终回答]' }
         const label = labelMap[value.type] || ''
@@ -439,6 +445,14 @@ const hasThinkOrToolEvents = (stepEvents) => {
 const getStepNumber = (stepEvents) => {
   if (!stepEvents || !stepEvents.length) return 0
   return stepEvents[0].step || 0
+}
+
+// 获取某步骤的最终回答文本：优先 finish 完整文本，否则拼接 answer 流式分块
+const getAnswerText = (stepEvents) => {
+  if (!stepEvents || !stepEvents.length) return ''
+  const finish = stepEvents.find(e => e.type === 'finish')
+  if (finish) return finish.content
+  return stepEvents.filter(e => e.type === 'answer').map(e => e.content).join('')
 }
 
 // Session sidebar methods
