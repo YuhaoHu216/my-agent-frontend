@@ -133,8 +133,8 @@
           <div class="message-content">
             <div class="message-bubble">
               <template v-if="message.content">
-                <template v-if="chatMode === 'agent' && message.role === 'ai'">
-                  <!-- 新格式：结构化事件展示 -->
+                <template v-if="message.role === 'ai'">
+                  <!-- 新格式：结构化事件展示（基于消息自身的 events 判断，不依赖当前模式） -->
                   <template v-if="message.events && message.events.length > 0">
                     <div v-for="(stepEvents, stepIdx) in groupedEvents(message.events)" :key="stepIdx" class="step-block">
                       <!-- 思考过程 - 可折叠面板（包含工具调用和结果） -->
@@ -252,7 +252,7 @@ const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
 
 // Chat mode: 'chat' or 'agent'
-const chatMode = ref('chat')
+const chatMode = ref(localStorage.getItem('chatMode') || 'chat')
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
@@ -379,7 +379,8 @@ const sendMessage = async () => {
 }
 
 const onModeChange = () => {
-  // 切换模式时保留对话内容，不做清空
+  // 切换模式时保留对话内容，不做清空，并持久化当前模式（刷新后恢复）
+  localStorage.setItem('chatMode', chatMode.value)
 }
 
 const formatContent = (content) => {
@@ -503,6 +504,7 @@ const enterSession = async (id) => {
       messages.value = res.data.map(msg => ({
         role: msg.role === 'USER' ? 'user' : 'ai',
         content: msg.text || '',
+        events: msg.events || undefined,
         time: formatTimestamp(msg.timestamp)
       }))
       await scrollToBottom()
@@ -686,6 +688,7 @@ onMounted(async () => {
         messages.value = res.data.map(msg => ({
           role: msg.role === 'USER' ? 'user' : 'ai',
           content: msg.text || '',
+          events: msg.events || undefined,
           time: formatTimestamp(msg.timestamp)
         }))
         await scrollToBottom()
