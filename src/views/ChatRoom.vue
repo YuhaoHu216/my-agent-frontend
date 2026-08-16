@@ -93,6 +93,10 @@
             <el-radio-button value="chat">Chat 模式</el-radio-button>
             <el-radio-button value="agent">Agent 模式</el-radio-button>
           </el-radio-group>
+          <el-select v-model="selectedModel" size="small" class="model-select" @change="onModelChange">
+            <el-option label="通义千问" value="qwen" />
+            <el-option label="DeepSeek" value="deepseek" />
+          </el-select>
         </div>
         <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
         <div class="header-right">
@@ -221,7 +225,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -254,6 +258,8 @@ const userInfo = computed(() => userStore.userInfo)
 
 // Chat mode: 'chat' or 'agent'
 const chatMode = ref(localStorage.getItem('chatMode') || 'chat')
+// Model selection: 'qwen' (通义千问) or 'deepseek'
+const selectedModel = ref(localStorage.getItem('selectedModel') || 'qwen')
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
@@ -301,6 +307,59 @@ const scrollToBottom = async () => {
   }
 }
 
+// 拉取指定会话的历史消息并映射为前端结构
+const fetchMessages = async (conversationId) => {
+  const res = await chatMemoryApi.getConversationMessages(conversationId)
+  if (res.code === 200 && Array.isArray(res.data)) {
+    return res.data.map(msg => ({
+      role: msg.role === 'USER' ? 'user' : 'ai',
+      content: msg.text || '',
+      events: msg.events || undefined,
+      time: formatTimestamp(msg.timestamp)
+    }))
+  }
+  return []
+}
+
+// 判断当前会话是否存在未完成的回复（最后一条为 USER 且无对应 ASSISTANT）
+const isIncomplete = () => {
+  if (!messages.value.length) return false
+  return messages.value[messages.value.length - 1].role === 'user'
+}
+
+let pollTimer = null
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+// 会话存在进行中的回复时，轮询拉取直到出现 ASSISTANT（Agent 后台执行完成后落库）
+const startPolling = (conversationId) => {
+  stopPolling()
+  pollTimer = setInterval(async () => {
+    if (chatId.value !== conversationId) {
+      stopPolling()
+      return
+    }
+    messages.value = await fetchMessages(conversationId)
+    await scrollToBottom()
+    if (!isIncomplete()) {
+      stopPolling()
+    }
+  }, 1500)
+}
+
+// 加载会话消息；若回复未完成则启动轮询恢复
+const loadMessages = async (conversationId, { poll = true } = {}) => {
+  messages.value = await fetchMessages(conversationId)
+  await scrollToBottom()
+  if (poll && isIncomplete()) {
+    startPolling(conversationId)
+  }
+}
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || isSending.value) return
 
@@ -325,15 +384,31 @@ const sendMessage = async () => {
     time: getCurrentTime()
   })
 
+  // 记录本次发送对应的会话，切走后再收到的流式输出将被丢弃（后端仍在后台执行并持久化）
+  const targetChatId = chatId.value
+
   try {
     const stream = chatMode.value === 'agent'
-      ? aiApi.doChatWithManus(userMessage, chatId.value)
-      : aiApi.doChatWithLoveAppSse(userMessage, chatId.value)
+      ? aiApi.doChatWithManus(userMessage, targetChatId, selectedModel.value)
+      : aiApi.doChatWithLoveAppSse(userMessage, targetChatId, selectedModel.value)
     const reader = stream.getReader()
+    let sessionsRefreshed = false
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
+
+      // 切换会话后，丢弃旧流的输出，避免污染新会话
+      if (chatId.value !== targetChatId) {
+        await scrollToBottom()
+        continue
+      }
+
+      // 首个事件到达时，后端已预写入 USER，刷新列表让新会话立即出现
+      if (!sessionsRefreshed) {
+        sessionsRefreshed = true
+        loadSessions()
+      }
 
       // Agent 模式：检测结构化事件
       if (chatMode.value === 'agent' && typeof value === 'object' && value.type) {
@@ -367,13 +442,15 @@ const sendMessage = async () => {
     }
   } catch (error) {
     console.error('发送消息失败:', error)
-    messages.value[aiMessageIndex].content = '抱歉，出现了一些问题，请稍后再试。'
+    if (chatId.value === targetChatId) {
+      messages.value[aiMessageIndex].content = '抱歉，出现了一些问题，请稍后再试。'
+    }
   } finally {
     isSending.value = false
     isLoading.value = false
     await scrollToBottom()
-    // 首次发消息后刷新侧边栏（新会话可能不在列表中）
-    if (!sessions.value.some(s => s.id === chatId.value)) {
+    // 首轮完成后刷新侧边栏（会话名/内容已更新）
+    if (chatId.value === targetChatId) {
       await loadSessions()
     }
   }
@@ -382,6 +459,11 @@ const sendMessage = async () => {
 const onModeChange = () => {
   // 切换模式时保留对话内容，不做清空，并持久化当前模式（刷新后恢复）
   localStorage.setItem('chatMode', chatMode.value)
+}
+
+const onModelChange = () => {
+  // 持久化当前模型选择（刷新后恢复）
+  localStorage.setItem('selectedModel', selectedModel.value)
 }
 
 // 按 step 编号分组事件
@@ -459,7 +541,6 @@ const handleNewChat = async () => {
       chatId.value = res.data
       messages.value = []
       router.replace({ path: '/chat-room', query: { conversationId: res.data } })
-      await loadSessions()
     }
   } catch (error) {
     console.error('创建会话失败:', error)
@@ -473,19 +554,11 @@ const enterSession = async (id) => {
   const isDifferent = id !== chatId.value
   chatId.value = id
   if (isDifferent) messages.value = []
+  stopPolling()
   router.replace({ path: '/chat-room', query: { conversationId: id } })
 
   try {
-    const res = await chatMemoryApi.getConversationMessages(id)
-    if (res.code === 200 && Array.isArray(res.data)) {
-      messages.value = res.data.map(msg => ({
-        role: msg.role === 'USER' ? 'user' : 'ai',
-        content: msg.text || '',
-        events: msg.events || undefined,
-        time: formatTimestamp(msg.timestamp)
-      }))
-      await scrollToBottom()
-    }
+    await loadMessages(id)
   } catch (error) {
     console.error('加载会话消息失败:', error)
     if (isDifferent) messages.value = []
@@ -658,18 +731,9 @@ onMounted(async () => {
 
   if (route.query.conversationId) {
     chatId.value = route.query.conversationId
-    // 加载已有会话的历史消息
+    // 加载已有会话的历史消息（回复未完成时自动轮询恢复）
     try {
-      const res = await chatMemoryApi.getConversationMessages(chatId.value)
-      if (res.code === 200 && res.data) {
-        messages.value = res.data.map(msg => ({
-          role: msg.role === 'USER' ? 'user' : 'ai',
-          content: msg.text || '',
-          events: msg.events || undefined,
-          time: formatTimestamp(msg.timestamp)
-        }))
-        await scrollToBottom()
-      }
+      await loadMessages(chatId.value)
     } catch (error) {
       console.error('加载会话消息失败:', error)
     }
@@ -678,13 +742,13 @@ onMounted(async () => {
       const res = await chatMemoryApi.newConversationId()
       chatId.value = res.data
       router.replace({ path: '/chat-room', query: { conversationId: res.data } })
-      // 新建会话后刷新侧边栏
-      await loadSessions()
     } catch (error) {
       console.error('获取会话ID失败:', error)
     }
   }
 })
+
+onUnmounted(stopPolling)
 </script>
 
 <style scoped lang="scss">
@@ -1022,6 +1086,9 @@ onMounted(async () => {
 
   .header-left {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 
     :deep(.el-radio-button__inner) {
       background: rgba(255, 255, 255, 0.06);
@@ -1043,6 +1110,33 @@ onMounted(async () => {
       color: #0f1c2b;
       border-color: transparent;
       box-shadow: none;
+    }
+
+    .model-select {
+      width: 128px;
+    }
+
+    :deep(.model-select .el-select__wrapper) {
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: none;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+    }
+
+    :deep(.model-select .el-select__wrapper.is-focused) {
+      box-shadow: 0 0 0 1px var(--accent) inset;
+    }
+
+    :deep(.model-select .el-select__placeholder) {
+      color: var(--text-tertiary);
+    }
+
+    :deep(.model-select .el-select__selected-item) {
+      color: var(--text-primary);
+    }
+
+    :deep(.model-select .el-select__caret) {
+      color: var(--text-secondary);
     }
   }
 

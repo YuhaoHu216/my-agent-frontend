@@ -60,13 +60,13 @@ const createSseStream = (url) => {
 }
 
 export const aiApi = {
-  doChatWithLoveAppSse(message, chatId) {
-    const url = `${BASE_URL}/ai/my_app/chat/sse/one?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`
+  doChatWithLoveAppSse(message, chatId, model) {
+    const url = `${BASE_URL}/ai/my_app/chat/sse/one?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}&model=${encodeURIComponent(model)}`
     return createSseStream(url)
   },
 
-  doChatWithManus(message, chatId) {
-    const url = `${BASE_URL}/ai/manus/chat?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`
+  doChatWithManus(message, chatId, model) {
+    const url = `${BASE_URL}/ai/manus/chat?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}&model=${encodeURIComponent(model)}`
     return createSseStream(url)
   },
 }
