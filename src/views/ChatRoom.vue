@@ -163,7 +163,7 @@
                       </div>
                       <!-- 最终回答（finish 完整文本，或 answer 流式分块累积） -->
                       <div v-if="getAnswerText(stepEvents)" class="finish-answer">
-                        {{ getAnswerText(stepEvents) }}
+                        <MarkdownRenderer :content="getAnswerText(stepEvents)" />
                       </div>
                       <!-- 错误提示 -->
                       <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'error' || e.type === 'max_steps')" :key="'warn-'+stepIdx+'-'+eIdx">
@@ -171,11 +171,9 @@
                       </div>
                     </div>
                   </template>
-                  <!-- 旧格式：纯文本回退（向后兼容） -->
+                  <!-- 旧格式：chat 模式 / 无结构化事件的 AI 消息，直接按 markdown 渲染 -->
                   <template v-else>
-                    <div v-for="(line, idx) in formatContent(message.content)" :key="idx" class="message-line">
-                      {{ line }}
-                    </div>
+                    <MarkdownRenderer :content="message.content" />
                   </template>
                 </template>
                 <template v-else>
@@ -245,6 +243,7 @@ import { aiApi } from '@/api/ai'
 import { chatMemoryApi } from '@/api/chatMemory'
 import { documentApi } from '@/api/document'
 import { logout } from '@/api/user'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -381,30 +380,6 @@ const sendMessage = async () => {
 const onModeChange = () => {
   // 切换模式时保留对话内容，不做清空，并持久化当前模式（刷新后恢复）
   localStorage.setItem('chatMode', chatMode.value)
-}
-
-const formatContent = (content) => {
-  if (!content) return []
-
-  const lines = content.split(/(Step \d+:)/g)
-  const result = []
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim()
-    if (!line) continue
-
-    if (line.startsWith('Step')) {
-      result.push(line)
-    } else {
-      if (result.length > 0) {
-        result[result.length - 1] += ' ' + line
-      } else {
-        result.push(line)
-      }
-    }
-  }
-
-  return result
 }
 
 // 按 step 编号分组事件
@@ -1010,14 +985,6 @@ onMounted(async () => {
         line-height: 1.5;
         word-wrap: break-word;
 
-        .message-line {
-          margin-bottom: 8px;
-
-          &:last-child {
-            margin-bottom: 0;
-          }
-        }
-
         // Agent 模式结构化事件样式
         .step-block {
           margin-bottom: 4px;
@@ -1111,11 +1078,6 @@ onMounted(async () => {
         }
 
         .finish-answer {
-          font-size: 14px;
-          color: #333;
-          line-height: 1.6;
-          white-space: pre-wrap;
-          word-break: break-word;
           padding-top: 4px;
         }
       }
