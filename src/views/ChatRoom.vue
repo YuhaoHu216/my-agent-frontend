@@ -138,7 +138,7 @@
           </div>
           <div class="message-content">
             <div class="message-bubble">
-              <template v-if="message.content">
+              <template v-if="message.content || (message.role === 'ai' && message.events && message.events.length > 0)">
                 <template v-if="message.role === 'ai'">
                   <!-- 新格式：结构化事件展示（基于消息自身的 events 判断，不依赖当前模式） -->
                   <template v-if="message.events && message.events.length > 0">
