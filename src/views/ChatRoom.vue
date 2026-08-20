@@ -93,9 +93,16 @@
             <el-radio-button value="chat">Chat 模式</el-radio-button>
             <el-radio-button value="agent">Agent 模式</el-radio-button>
           </el-radio-group>
-          <el-select v-model="selectedModel" size="small" class="model-select" @change="onModelChange">
-            <el-option label="通义千问" value="qwen" />
-            <el-option label="DeepSeek" value="deepseek" />
+          <el-select
+            v-model="selectedModel"
+            size="small"
+            class="model-select"
+            placeholder="未配置模型"
+            @change="onModelChange"
+          >
+            <el-option-group v-for="g in modelGroups" :key="g.label" :label="g.label">
+              <el-option v-for="m in g.options" :key="m.value" :label="m.label" :value="m.value" />
+            </el-option-group>
           </el-select>
         </div>
         <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
@@ -118,6 +125,9 @@
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/mcp-config')">
                     <el-icon><SetUp /></el-icon> MCP 配置
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/llm-config')">
+                    <el-icon><Cpu /></el-icon> LLM 配置
                   </el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">
                     <el-icon><SwitchButton /></el-icon> 退出登录
@@ -252,6 +262,7 @@ import { useUserStore } from '@/stores/user'
 import { aiApi } from '@/api/ai'
 import { chatMemoryApi } from '@/api/chatMemory'
 import { documentApi } from '@/api/document'
+import { llmConfigApi } from '@/api/llmConfig'
 import { logout } from '@/api/user'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
@@ -262,8 +273,41 @@ const userInfo = computed(() => userStore.userInfo)
 
 // Chat mode: 'chat' or 'agent'
 const chatMode = ref(localStorage.getItem('chatMode') || 'chat')
-// Model selection: 'qwen' (通义千问) or 'deepseek'
-const selectedModel = ref(localStorage.getItem('selectedModel') || 'qwen')
+// Model selection: 选中项存 "providerCode:modelName" 组合（如 "qwen:qwen-max"），选项来自用户 LLM 配置
+const selectedModel = ref(localStorage.getItem('selectedModel') || '')
+const modelGroups = ref([])
+// 后端 provider 枚举名 -> 前端 model 参数（ModelEnum code）
+const providerCodeMap = { DASHSCOPE: 'qwen', DEEPSEEK: 'deepseek' }
+
+// 从用户 LLM 配置动态生成"供应商分组 -> 模型"下拉选项；选中项未配置时回退到第一个已配置项
+const loadModelOptions = async () => {
+  try {
+    const res = await llmConfigApi.list()
+    const enabled = (res.data || []).filter((c) => c.enabled === 1)
+    modelGroups.value = enabled
+      .filter((c) => providerCodeMap[c.provider] && c.models && c.models.length)
+      .map((c) => ({
+        label: c.providerLabel,
+        options: c.models.map((modelName) => ({
+          value: `${providerCodeMap[c.provider]}:${modelName}`,
+          label: modelName,
+        })),
+      }))
+    const allOptions = modelGroups.value.flatMap((g) => g.options)
+    if (!allOptions.some((m) => m.value === selectedModel.value)) {
+      selectedModel.value = allOptions.length ? allOptions[0].value : ''
+    }
+    localStorage.setItem('selectedModel', selectedModel.value)
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+// 从 "providerCode:modelName" 组合中拆分出供应商 code 和模型名
+const splitModel = (value) => {
+  const idx = value.indexOf(':')
+  return idx === -1 ? [value, ''] : [value.slice(0, idx), value.slice(idx + 1)]
+}
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
@@ -366,6 +410,10 @@ const loadMessages = async (conversationId, { poll = true } = {}) => {
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || isSending.value) return
+  if (!selectedModel.value) {
+    ElMessage.warning('请先在「LLM 配置」页面配置 API Key 和模型')
+    return
+  }
 
   const userMessage = inputMessage.value.trim()
   inputMessage.value = ''
@@ -392,9 +440,10 @@ const sendMessage = async () => {
   const targetChatId = chatId.value
 
   try {
+    const [model, modelName] = splitModel(selectedModel.value)
     const stream = chatMode.value === 'agent'
-      ? aiApi.doChatWithManus(userMessage, targetChatId, selectedModel.value)
-      : aiApi.doChatWithLoveAppSse(userMessage, targetChatId, selectedModel.value)
+      ? aiApi.doChatWithManus(userMessage, targetChatId, model, modelName)
+      : aiApi.doChatWithLoveAppSse(userMessage, targetChatId, model, modelName)
     const reader = stream.getReader()
     let sessionsRefreshed = false
 
@@ -732,6 +781,7 @@ const formatTime = (timeStr) => {
 
 onMounted(async () => {
   await loadSessions()
+  await loadModelOptions()
 
   if (route.query.conversationId) {
     chatId.value = route.query.conversationId

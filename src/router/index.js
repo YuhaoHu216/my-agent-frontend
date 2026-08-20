@@ -24,6 +24,12 @@ const routes = [
     meta: { title: 'MCP 配置', auth: true },
   },
   {
+    path: '/llm-config',
+    name: 'LlmConfig',
+    component: () => import('../views/LlmConfig.vue'),
+    meta: { title: 'LLM 配置', auth: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
