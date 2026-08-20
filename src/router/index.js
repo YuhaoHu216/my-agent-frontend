@@ -18,6 +18,12 @@ const routes = [
     meta: { title: 'AI 助手', auth: true },
   },
   {
+    path: '/mcp-config',
+    name: 'McpConfig',
+    component: () => import('../views/McpConfig.vue'),
+    meta: { title: 'MCP 配置', auth: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),

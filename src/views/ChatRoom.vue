@@ -116,6 +116,9 @@
                       <p><el-icon><Calendar /></el-icon> 注册时间：{{ formatTime(userInfo.createTime) }}</p>
                     </div>
                   </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/mcp-config')">
+                    <el-icon><SetUp /></el-icon> MCP 配置
+                  </el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">
                     <el-icon><SwitchButton /></el-icon> 退出登录
                   </el-dropdown-item>
@@ -242,7 +245,8 @@ import {
   Calendar,
   SwitchButton,
   Upload,
-  Loading
+  Loading,
+  SetUp
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { aiApi } from '@/api/ai'
