@@ -4,32 +4,6 @@ import { injectRouter } from '@/utils/request'
 
 const routes = [
   {
-    path: '/',
-    redirect: '/chat-room',
-  },
-  {
-    path: '/home',
-    redirect: '/chat-room',
-  },
-  {
-    path: '/chat-room',
-    name: 'ChatRoom',
-    component: () => import('../views/ChatRoom.vue'),
-    meta: { title: 'AI 助手', auth: true },
-  },
-  {
-    path: '/mcp-config',
-    name: 'McpConfig',
-    component: () => import('../views/McpConfig.vue'),
-    meta: { title: 'MCP 配置', auth: true },
-  },
-  {
-    path: '/llm-config',
-    name: 'LlmConfig',
-    component: () => import('../views/LlmConfig.vue'),
-    meta: { title: 'LLM 配置', auth: true },
-  },
-  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
@@ -42,8 +16,40 @@ const routes = [
     meta: { title: '注册' },
   },
   {
+    path: '/',
+    component: () => import('../layouts/AppLayout.vue'),
+    meta: { auth: true },
+    children: [
+      { path: '', redirect: { name: 'Chat' } },
+      {
+        path: 'chat',
+        name: 'Chat',
+        component: () => import('../views/ChatRoom.vue'),
+        meta: { title: 'AI 助手' },
+      },
+      {
+        path: 'documents',
+        name: 'Documents',
+        component: () => import('../views/Documents.vue'),
+        meta: { title: '文档' },
+      },
+      {
+        path: 'llm-config',
+        name: 'LlmConfig',
+        component: () => import('../views/LlmConfig.vue'),
+        meta: { title: 'LLM 配置' },
+      },
+      {
+        path: 'mcp-config',
+        name: 'McpConfig',
+        component: () => import('../views/McpConfig.vue'),
+        meta: { title: 'MCP 配置' },
+      },
+    ],
+  },
+  {
     path: '/:pathMatch(.*)*',
-    redirect: '/chat-room',
+    redirect: { name: 'Chat' },
   },
 ]
 
@@ -84,7 +90,7 @@ router.beforeEach(async (to, from, next) => {
 
   // 已登录用户访问登录/注册页 → 跳聊天页
   if ((to.name === 'Login' || to.name === 'Register') && userStore.token) {
-    return next({ path: '/chat-room' })
+    return next({ path: '/chat' })
   }
 
   next()
