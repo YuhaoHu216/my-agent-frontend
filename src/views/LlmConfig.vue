@@ -1,13 +1,8 @@
 <template>
-  <div class="llm-config-page">
-    <div class="page-header">
-      <div class="header-left">
-        <el-button link @click="router.push('/chat-room')">
-          <el-icon><ArrowLeft /></el-icon> 返回
-        </el-button>
-        <h2>LLM 配置</h2>
-      </div>
-    </div>
+  <div class="llm-config-page glass-page">
+    <header class="page-toolbar">
+      <h2>LLM 配置</h2>
+    </header>
 
     <el-alert
       type="info"
@@ -17,7 +12,7 @@
       title="每个供应商配置一个 API Key，在该 Key 下可添加多个模型；未配置前无法使用对话功能。"
     />
 
-    <el-card v-for="p in providerOptions" :key="p.value" shadow="never" class="provider-card">
+    <el-card v-for="p in providerOptions" :key="p.value" shadow="never" class="glass-card provider-card">
       <template #header>
         <div class="card-header">
           <span class="provider-name">{{ p.label }}</span>
@@ -79,12 +74,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
 import { llmConfigApi } from '@/api/llmConfig'
-
-const router = useRouter()
 
 const providerOptions = [
   { value: 'DASHSCOPE', label: '通义千问' },
@@ -235,23 +226,6 @@ onMounted(() => {
 .llm-config-page {
   max-width: 860px;
   margin: 0 auto;
-  padding: 24px;
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.header-left h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #303133;
 }
 .tips {
   margin-bottom: 16px;
@@ -267,6 +241,7 @@ onMounted(() => {
 .provider-name {
   font-size: 16px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 .card-header-right {
   display: flex;
@@ -275,7 +250,7 @@ onMounted(() => {
 }
 .enable-label {
   font-size: 13px;
-  color: #909399;
+  color: var(--text-secondary);
 }
 .model-tags {
   margin-bottom: 8px;

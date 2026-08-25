@@ -209,7 +209,7 @@ watch(
   flex-shrink: 0;
   max-height: 480px;
   overflow-y: auto;
-  border-right: 1px solid var(--el-border-color-lighter);
+  border-right: 1px solid var(--glass-border);
   padding-right: 12px;
 }
 .tool-item {
@@ -217,15 +217,15 @@ watch(
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.75);
   word-break: break-all;
 }
 .tool-item:hover {
-  background: var(--el-fill-color-light);
+  background: rgba(255, 255, 255, 0.08);
 }
 .tool-item.active {
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+  background: rgba(94, 234, 212, 0.16);
+  color: var(--accent);
   font-weight: 600;
 }
 .tool-detail {
@@ -237,27 +237,28 @@ watch(
 .tool-name {
   margin: 0 0 6px;
   font-size: 16px;
+  color: var(--text-primary);
 }
 .tool-desc {
   margin: 0 0 12px;
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 .param-form {
   margin-bottom: 8px;
 }
 .no-param {
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 .action-row {
   margin-bottom: 12px;
 }
 .result-box {
-  border: 1px solid var(--el-border-color);
+  border: 1px solid var(--glass-border);
   border-radius: 6px;
   padding: 12px;
-  background: #fafafa;
+  background: rgba(0, 0, 0, 0.25);
 }
 .result-box.error {
   border-color: var(--el-color-danger);
@@ -266,6 +267,7 @@ watch(
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 6px;
+  color: var(--text-primary);
 }
 .result-content {
   margin: 0;
@@ -275,5 +277,6 @@ watch(
   word-break: break-word;
   max-height: 260px;
   overflow-y: auto;
+  color: var(--text-primary);
 }
 </style>

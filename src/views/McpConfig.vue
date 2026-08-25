@@ -1,18 +1,15 @@
 <template>
-  <div class="mcp-config-page">
-    <div class="page-header">
-      <div class="header-left">
-        <el-button link @click="router.push('/chat-room')">
-          <el-icon><ArrowLeft /></el-icon> 返回
+  <div class="mcp-config-page glass-page">
+    <header class="page-toolbar">
+      <h2>MCP 服务配置</h2>
+      <div class="toolbar-actions">
+        <el-button type="primary" @click="openDialog()">
+          <el-icon><Plus /></el-icon> 新增服务
         </el-button>
-        <h2>MCP 服务配置</h2>
       </div>
-      <el-button type="primary" @click="openDialog()">
-        <el-icon><Plus /></el-icon> 新增服务
-      </el-button>
-    </div>
+    </header>
 
-    <el-card shadow="never" class="table-card">
+    <el-card shadow="never" class="glass-card table-card">
       <el-table v-loading="loading" :data="servers" border stripe>
         <el-table-column prop="serverName" label="服务名称" min-width="140" />
         <el-table-column prop="url" label="服务地址" min-width="280" show-overflow-tooltip />
@@ -71,13 +68,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import { mcpApi } from '@/api/mcp'
 import McpServerDetail from './McpServerDetail.vue'
-
-const router = useRouter()
 
 const loading = ref(false)
 const servers = ref([])
@@ -209,22 +203,5 @@ onMounted(fetchList)
 .mcp-config-page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.header-left h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #303133;
 }
 </style>
