@@ -1,95 +1,98 @@
 <template>
-  <div class="chat-layout">
-    <div class="sidebar">
-      <el-tabs v-model="activeSidebarTab" class="sidebar-tabs">
-        <el-tab-pane label="会话" name="sessions">
-          <div class="sidebar-header">
-            <h2>历史会话</h2>
-            <el-button type="primary" size="small" @click="handleNewChat" :loading="creatingNew">
-              <el-icon><Plus /></el-icon>
-              新建会话
-            </el-button>
-          </div>
-          <div class="session-list" v-loading="loadingSessions">
-            <div
-              v-for="session in sessions"
-              :key="session.id"
-              :class="['session-item', { active: session.id === chatId }]"
-              @click="enterSession(session.id)"
-            >
-              <span class="session-name">{{ session.name }}</span>
-              <span class="session-actions">
-                <el-button link size="small" @click.stop="handleRename(session)">
-                  <el-icon><Edit /></el-icon>
-                </el-button>
-                <el-popconfirm
-                  title="确定要删除该会话吗？"
-                  confirm-button-text="删除"
-                  cancel-button-text="取消"
-                  popper-class="glass-popper"
-                  @confirm="handleDelete(session.id)"
-                >
-                  <template #reference>
-                    <el-button link size="small" @click.stop>
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </template>
-                </el-popconfirm>
-              </span>
-            </div>
-            <el-empty v-if="!loadingSessions && sessions.length === 0" description="暂无历史会话" :image-size="60" />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="文档" name="documents">
-          <div class="doc-search-bar">
-            <el-input v-model="searchQuery" placeholder="搜索文档..." size="small" clearable @keyup.enter="handleDocSearch" />
-            <el-button size="small" type="primary" @click="handleDocSearch" :loading="searching">搜索</el-button>
-          </div>
-          <div class="doc-upload-bar">
-            <el-upload :auto-upload="false" :show-file-list="false" :on-change="handleFileChange" accept="*">
-              <el-button size="small" type="primary" plain>
-                <el-icon><Upload /></el-icon> 上传文档
-              </el-button>
-            </el-upload>
-          </div>
-          <div class="doc-list" v-loading="loadingDocs">
-            <div
-              v-for="doc in filteredDocs"
-              :key="doc.id"
-              :class="['doc-item', { active: selectedDocId === doc.id }]"
-              @click="selectedDocId = doc.id"
-            >
-              <span class="doc-name">{{ doc.fileName }}</span>
-              <span class="doc-actions">
-                <el-button link size="small" @click.stop="handleDocDownload(doc)">
-                  <el-icon><Download /></el-icon>
-                </el-button>
-                <el-popconfirm
-                  title="确定要删除该文档吗？"
-                  confirm-button-text="删除"
-                  cancel-button-text="取消"
-                  popper-class="glass-popper"
-                  @confirm="handleDocDelete(doc.id)"
-                >
-                  <template #reference>
-                    <el-button link size="small" @click.stop>
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </template>
-                </el-popconfirm>
-              </span>
-            </div>
-            <el-empty v-if="!loadingDocs && filteredDocs.length === 0" description="暂无文档" :image-size="60" />
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+  <div class="chat-page">
+    <div class="chat-header">
+      <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
     </div>
 
-    <div class="main-area">
-      <div class="chat-header">
-        <div class="header-left">
-          <el-radio-group v-model="chatMode" size="small" @change="onModeChange">
+    <div class="chat-messages glass-scroll" v-show="messages.length > 0" ref="messagesContainer">
+      <div
+        v-for="(message, index) in messages"
+        :key="index"
+        :class="['message', message.role, chatMode]"
+      >
+        <div class="message-avatar">
+          <el-avatar v-if="message.role === 'ai'" :icon="chatMode === 'agent' ? Cpu : UserFilled" />
+          <el-avatar v-else :icon="User" />
+        </div>
+        <div class="message-content">
+          <div class="message-bubble">
+            <template v-if="message.content || (message.role === 'ai' && message.events && message.events.length > 0)">
+              <template v-if="message.role === 'ai'">
+                <!-- 新格式：结构化事件展示（基于消息自身的 events 判断，不依赖当前模式） -->
+                <template v-if="message.events && message.events.length > 0">
+                  <div v-for="(stepEvents, stepIdx) in groupedEvents(message.events)" :key="stepIdx" class="step-block">
+                    <!-- 思考过程 - 可折叠面板（包含工具调用和结果） -->
+                    <div v-if="hasThinkOrToolEvents(stepEvents)" class="think-event">
+                      <el-collapse v-model="activeThinkingPanels" class="think-collapse">
+                        <el-collapse-item :name="'step-'+getStepNumber(stepEvents)">
+                          <template #title>
+                            <el-icon class="think-icon"><Loading v-if="getStepNumber(stepEvents) === message.currentStep && isSending" /></el-icon>
+                            第 {{ getStepNumber(stepEvents) }} 步思考过程
+                          </template>
+                          <!-- 思考内容 -->
+                          <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'think')" :key="'think-'+stepIdx+'-'+eIdx" class="thinking-content">{{ event.content }}</div>
+                          <!-- 工具调用信息 -->
+                          <div v-if="hasToolEvents(stepEvents)" class="tool-section">
+                            <div class="tool-section-divider">— 工具调用 —</div>
+                            <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_call')" :key="'toolcall-'+stepIdx+'-'+eIdx" class="tool-call-info">
+                              <el-tag size="small" type="info" class="tool-call-tag">调用工具</el-tag>
+                              <span class="tool-call-detail">{{ formatToolCalls(event.content) }}</span>
+                            </div>
+                            <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_result')" :key="'result-'+stepIdx+'-'+eIdx" class="tool-result">
+                              <div class="tool-result-text">{{ event.content }}</div>
+                            </div>
+                          </div>
+                        </el-collapse-item>
+                      </el-collapse>
+                    </div>
+                    <!-- 最终回答（finish 完整文本，或 answer 流式分块累积） -->
+                    <div v-if="getAnswerText(stepEvents)" class="finish-answer">
+                      <MarkdownRenderer :content="getAnswerText(stepEvents)" />
+                    </div>
+                    <!-- 错误提示 -->
+                    <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'error' || e.type === 'max_steps')" :key="'warn-'+stepIdx+'-'+eIdx">
+                      <el-alert :title="event.content" type="warning" :closable="false" show-icon />
+                    </div>
+                  </div>
+                </template>
+                <!-- 旧格式：chat 模式 / 无结构化事件的 AI 消息，直接按 markdown 渲染 -->
+                <template v-else>
+                  <MarkdownRenderer :content="message.content" />
+                </template>
+              </template>
+              <template v-else>
+                {{ message.content }}
+              </template>
+            </template>
+            <div v-else class="typing">
+              <span class="dot">.</span>
+              <span class="dot">.</span>
+              <span class="dot">.</span>
+            </div>
+          </div>
+          <div class="message-time">{{ message.time }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input" :class="{ centered: messages.length === 0 }">
+      <div v-if="messages.length === 0" class="welcome-greeting">
+        <h2>你好，我是你的 AI 助手</h2>
+        <p>今天想让我帮你做点什么？</p>
+      </div>
+      <div class="input-wrapper">
+        <el-input
+          v-model="inputMessage"
+          placeholder="请输入消息..."
+          @keyup.enter="sendMessage"
+          :disabled="isSending"
+          type="textarea"
+          :rows="3"
+          resize="none"
+          class="message-textarea"
+        />
+        <div class="input-toolbar">
+          <el-radio-group v-model="chatMode" size="small" @change="chatStore.setMode">
             <el-radio-button value="chat">Chat 模式</el-radio-button>
             <el-radio-button value="agent">Agent 模式</el-radio-button>
           </el-radio-group>
@@ -97,139 +100,22 @@
             v-model="selectedModel"
             size="small"
             class="model-select"
+            popper-class="glass-popper"
             placeholder="未配置模型"
-            @change="onModelChange"
+            @change="chatStore.setModel"
           >
             <el-option-group v-for="g in modelGroups" :key="g.label" :label="g.label">
               <el-option v-for="m in g.options" :key="m.value" :label="m.label" :value="m.value" />
             </el-option-group>
           </el-select>
-        </div>
-        <span class="chat-title">{{ chatMode === 'chat' ? 'AI 助手' : 'AI 智能体' }}</span>
-        <div class="header-right">
-          <div class="user-info" v-if="userInfo">
-            <el-dropdown trigger="click" popper-class="glass-popper">
-              <div class="user-avatar">
-                <el-avatar :size="32" :icon="UserFilled" />
-                <span class="username">{{ userInfo.username }}</span>
-              </div>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item>
-                    <div class="user-detail">
-                      <p><el-icon><User /></el-icon> 用户名：{{ userInfo.username }}</p>
-                      <p><el-icon><Message /></el-icon> 邮箱：{{ userInfo.email }}</p>
-                      <p v-if="userInfo.phone"><el-icon><Phone /></el-icon> 手机：{{ userInfo.phone }}</p>
-                      <p><el-icon><Calendar /></el-icon> 注册时间：{{ formatTime(userInfo.createTime) }}</p>
-                    </div>
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/mcp-config')">
-                    <el-icon><SetUp /></el-icon> MCP 配置
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/llm-config')">
-                    <el-icon><Cpu /></el-icon> LLM 配置
-                  </el-dropdown-item>
-                  <el-dropdown-item divided @click="handleLogout">
-                    <el-icon><SwitchButton /></el-icon> 退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-        </div>
-      </div>
-
-      <div class="chat-messages" ref="messagesContainer">
-        <div
-          v-for="(message, index) in messages"
-          :key="index"
-          :class="['message', message.role, chatMode]"
-        >
-          <div class="message-avatar">
-            <el-avatar v-if="message.role === 'ai'" :icon="chatMode === 'agent' ? Cpu : UserFilled" />
-            <el-avatar v-else :icon="User" />
-          </div>
-          <div class="message-content">
-            <div class="message-bubble">
-              <template v-if="message.content || (message.role === 'ai' && message.events && message.events.length > 0)">
-                <template v-if="message.role === 'ai'">
-                  <!-- 新格式：结构化事件展示（基于消息自身的 events 判断，不依赖当前模式） -->
-                  <template v-if="message.events && message.events.length > 0">
-                    <div v-for="(stepEvents, stepIdx) in groupedEvents(message.events)" :key="stepIdx" class="step-block">
-                      <!-- 思考过程 - 可折叠面板（包含工具调用和结果） -->
-                      <div v-if="hasThinkOrToolEvents(stepEvents)" class="think-event">
-                        <el-collapse v-model="activeThinkingPanels" class="think-collapse">
-                          <el-collapse-item :name="'step-'+getStepNumber(stepEvents)">
-                            <template #title>
-                              <el-icon class="think-icon"><Loading v-if="getStepNumber(stepEvents) === message.currentStep && isSending" /></el-icon>
-                              第 {{ getStepNumber(stepEvents) }} 步思考过程
-                            </template>
-                            <!-- 思考内容 -->
-                            <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'think')" :key="'think-'+stepIdx+'-'+eIdx" class="thinking-content">{{ event.content }}</div>
-                            <!-- 工具调用信息 -->
-                            <div v-if="hasToolEvents(stepEvents)" class="tool-section">
-                              <div class="tool-section-divider">— 工具调用 —</div>
-                              <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_call')" :key="'toolcall-'+stepIdx+'-'+eIdx" class="tool-call-info">
-                                <el-tag size="small" type="info" class="tool-call-tag">调用工具</el-tag>
-                                <span class="tool-call-detail">{{ formatToolCalls(event.content) }}</span>
-                              </div>
-                              <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'tool_result')" :key="'result-'+stepIdx+'-'+eIdx" class="tool-result">
-                                <div class="tool-result-text">{{ event.content }}</div>
-                              </div>
-                            </div>
-                          </el-collapse-item>
-                        </el-collapse>
-                      </div>
-                      <!-- 最终回答（finish 完整文本，或 answer 流式分块累积） -->
-                      <div v-if="getAnswerText(stepEvents)" class="finish-answer">
-                        <MarkdownRenderer :content="getAnswerText(stepEvents)" />
-                      </div>
-                      <!-- 错误提示 -->
-                      <div v-for="(event, eIdx) in stepEvents.filter(e => e.type === 'error' || e.type === 'max_steps')" :key="'warn-'+stepIdx+'-'+eIdx">
-                        <el-alert :title="event.content" type="warning" :closable="false" show-icon />
-                      </div>
-                    </div>
-                  </template>
-                  <!-- 旧格式：chat 模式 / 无结构化事件的 AI 消息，直接按 markdown 渲染 -->
-                  <template v-else>
-                    <MarkdownRenderer :content="message.content" />
-                  </template>
-                </template>
-                <template v-else>
-                  {{ message.content }}
-                </template>
-              </template>
-              <div v-else class="typing">
-                <span class="dot">.</span>
-                <span class="dot">.</span>
-                <span class="dot">.</span>
-              </div>
-            </div>
-            <div class="message-time">{{ message.time }}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chat-input">
-        <div class="input-wrapper">
-          <el-input
-            v-model="inputMessage"
-            placeholder="请输入消息..."
-            @keyup.enter="sendMessage"
-            :disabled="isSending"
-            type="textarea"
-            :rows="3"
-            resize="none"
-            class="message-textarea"
-          />
           <el-button
             type="primary"
             @click="sendMessage"
-            :loading="isSending"
             :disabled="!inputMessage.trim()"
             class="send-button"
           >
-            <el-icon><Top /></el-icon>
+            <el-icon v-if="isSending" class="send-spinner"><Loading /></el-icon>
+            <el-icon v-else class="send-arrow"><Top /></el-icon>
           </el-button>
         </div>
       </div>
@@ -238,43 +124,24 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  User,
-  UserFilled,
-  Cpu,
-  Top,
-  Plus,
-  Edit,
-  Delete,
-  Download,
-  Message,
-  Phone,
-  Calendar,
-  SwitchButton,
-  Upload,
-  Loading,
-  SetUp
-} from '@element-plus/icons-vue'
-import { useUserStore } from '@/stores/user'
+defineOptions({ name: 'ChatRoom' })
+
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
+import { User, UserFilled, Cpu, Top, Loading } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
 import { chatMemoryApi } from '@/api/chatMemory'
-import { documentApi } from '@/api/document'
 import { llmConfigApi } from '@/api/llmConfig'
-import { logout } from '@/api/user'
+import { useChatStore } from '@/stores/chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
-const router = useRouter()
 const route = useRoute()
-const userStore = useUserStore()
-const userInfo = computed(() => userStore.userInfo)
+const chatStore = useChatStore()
+const { messages, chatMode, selectedModel, isSending, currentChatId } = storeToRefs(chatStore)
 
-// Chat mode: 'chat' or 'agent'
-const chatMode = ref(localStorage.getItem('chatMode') || 'chat')
 // Model selection: 选中项存 "providerCode:modelName" 组合（如 "qwen:qwen-max"），选项来自用户 LLM 配置
-const selectedModel = ref(localStorage.getItem('selectedModel') || '')
 const modelGroups = ref([])
 // 后端 provider 枚举名 -> 前端 model 参数（ModelEnum code）
 const providerCodeMap = { DASHSCOPE: 'qwen', DEEPSEEK: 'deepseek' }
@@ -295,9 +162,8 @@ const loadModelOptions = async () => {
       }))
     const allOptions = modelGroups.value.flatMap((g) => g.options)
     if (!allOptions.some((m) => m.value === selectedModel.value)) {
-      selectedModel.value = allOptions.length ? allOptions[0].value : ''
+      chatStore.setModel(allOptions.length ? allOptions[0].value : '')
     }
-    localStorage.setItem('selectedModel', selectedModel.value)
   } catch (e) {
     console.error(e)
   }
@@ -308,44 +174,31 @@ const splitModel = (value) => {
   const idx = value.indexOf(':')
   return idx === -1 ? [value, ''] : [value.slice(0, idx), value.slice(idx + 1)]
 }
-const messages = ref([])
+
 const inputMessage = ref('')
-const isLoading = ref(false)
-const isSending = ref(false)
-const chatId = ref('')
 const messagesContainer = ref(null)
 // Agent 模式下当前正在思考的面板（默认展开当前步骤的思考）
 const activeThinkingPanels = ref([])
-
-// Session sidebar
-const sessions = ref([])
-const loadingSessions = ref(false)
-const creatingNew = ref(false)
-
-// Sidebar tabs
-const activeSidebarTab = ref('sessions')
-
-// Document management
-const docs = ref([])
-const loadingDocs = ref(false)
-const searchQuery = ref('')
-const searching = ref(false)
-const searchResults = ref(null)
-const selectedDocId = ref(null)
-const uploading = ref(false)
-
-const filteredDocs = computed(() => {
-  return searchResults.value !== null ? searchResults.value : docs.value
-})
 
 const getCurrentTime = () => {
   const now = new Date()
   return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+// 消息时间分级显示：今天 → 时分；今年（非今天）→ 月-日 时分；往年 → 年-月-日 时分
 const formatTimestamp = (ts) => {
   if (!ts) return ''
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  const d = new Date(ts)
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+    return time
+  }
+  const date = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return d.getFullYear() === now.getFullYear()
+    ? `${date} ${time}`
+    : `${d.getFullYear()}-${date} ${time}`
 }
 
 const scrollToBottom = async () => {
@@ -387,7 +240,7 @@ const stopPolling = () => {
 const startPolling = (conversationId) => {
   stopPolling()
   pollTimer = setInterval(async () => {
-    if (chatId.value !== conversationId) {
+    if (currentChatId.value !== conversationId) {
       stopPolling()
       return
     }
@@ -427,7 +280,6 @@ const sendMessage = async () => {
   await scrollToBottom()
 
   isSending.value = true
-  isLoading.value = true
 
   const aiMessageIndex = messages.value.length
   messages.value.push({
@@ -437,7 +289,7 @@ const sendMessage = async () => {
   })
 
   // 记录本次发送对应的会话，切走后再收到的流式输出将被丢弃（后端仍在后台执行并持久化）
-  const targetChatId = chatId.value
+  const targetChatId = currentChatId.value
 
   try {
     const [model, modelName] = splitModel(selectedModel.value)
@@ -452,7 +304,7 @@ const sendMessage = async () => {
       if (done) break
 
       // 切换会话后，丢弃旧流的输出，避免污染新会话
-      if (chatId.value !== targetChatId) {
+      if (currentChatId.value !== targetChatId) {
         await scrollToBottom()
         continue
       }
@@ -460,7 +312,7 @@ const sendMessage = async () => {
       // 首个事件到达时，后端已预写入 USER，刷新列表让新会话立即出现
       if (!sessionsRefreshed) {
         sessionsRefreshed = true
-        loadSessions()
+        chatStore.loadSessions()
       }
 
       // Agent 模式：检测结构化事件
@@ -495,28 +347,17 @@ const sendMessage = async () => {
     }
   } catch (error) {
     console.error('发送消息失败:', error)
-    if (chatId.value === targetChatId) {
+    if (currentChatId.value === targetChatId) {
       messages.value[aiMessageIndex].content = '抱歉，出现了一些问题，请稍后再试。'
     }
   } finally {
     isSending.value = false
-    isLoading.value = false
     await scrollToBottom()
     // 首轮完成后刷新侧边栏（会话名/内容已更新）
-    if (chatId.value === targetChatId) {
-      await loadSessions()
+    if (currentChatId.value === targetChatId) {
+      await chatStore.loadSessions()
     }
   }
-}
-
-const onModeChange = () => {
-  // 切换模式时保留对话内容，不做清空，并持久化当前模式（刷新后恢复）
-  localStorage.setItem('chatMode', chatMode.value)
-}
-
-const onModelChange = () => {
-  // 持久化当前模型选择（刷新后恢复）
-  localStorage.setItem('selectedModel', selectedModel.value)
 }
 
 // 按 step 编号分组事件
@@ -568,687 +409,60 @@ const getAnswerText = (stepEvents) => {
   return stepEvents.filter(e => e.type === 'answer').map(e => e.content).join('')
 }
 
-// Session sidebar methods
-const loadSessions = async () => {
-  loadingSessions.value = true
-  try {
-    const res = await chatMemoryApi.getAllConversationsSummary()
-    if (res.code === 200 && res.data) {
-      sessions.value = Object.entries(res.data).map(([id, info]) => ({
-        id,
-        name: info.name || id
-      }))
-    }
-  } catch (error) {
-    console.error('获取会话列表失败:', error)
-  } finally {
-    loadingSessions.value = false
-  }
-}
-
-const handleNewChat = async () => {
-  creatingNew.value = true
-  try {
-    const res = await chatMemoryApi.newConversationId()
-    if (res.code === 200) {
-      chatId.value = res.data
-      messages.value = []
-      router.replace({ path: '/chat-room', query: { conversationId: res.data } })
-    }
-  } catch (error) {
-    console.error('创建会话失败:', error)
-    ElMessage.error('创建会话失败')
-  } finally {
-    creatingNew.value = false
-  }
-}
-
-const enterSession = async (id) => {
-  const isDifferent = id !== chatId.value
-  chatId.value = id
-  if (isDifferent) messages.value = []
-  stopPolling()
-  router.replace({ path: '/chat-room', query: { conversationId: id } })
-
-  try {
-    await loadMessages(id)
-  } catch (error) {
-    console.error('加载会话消息失败:', error)
-    if (isDifferent) messages.value = []
-    ElMessage.error('加载会话消息失败')
-  }
-}
-
-const handleRename = async (session) => {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新的会话名称', '重命名', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValue: session.name
-    })
-    if (value && value.trim()) {
-      const res = await chatMemoryApi.updateConversationName(session.id, value.trim())
-      if (res.code === 200) {
-        session.name = value.trim()
-        ElMessage.success('重命名成功')
-      }
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('重命名失败:', error)
-    }
-  }
-}
-
-const handleDelete = async (id) => {
-  try {
-    const res = await chatMemoryApi.deleteConversation(id)
-    if (res.code === 200) {
-      sessions.value = sessions.value.filter(s => s.id !== id)
-      if (id === chatId.value) {
-        chatId.value = ''
-        messages.value = []
-      }
-      ElMessage.success('删除成功')
-    }
-  } catch (error) {
-    console.error('删除会话失败:', error)
-    ElMessage.error('删除会话失败')
-  }
-}
-
-// Document management
-const loadDocs = async () => {
-  loadingDocs.value = true
-  try {
-    const res = await documentApi.list()
-    if (res.code === 200 && res.data) {
-      docs.value = res.data
-      searchResults.value = null
-    }
-  } catch (error) {
-    console.error('获取文档列表失败:', error)
-  } finally {
-    loadingDocs.value = false
-  }
-}
-
-const handleDocSearch = async () => {
-  if (!searchQuery.value.trim()) {
-    await loadDocs()
-    return
-  }
-  searching.value = true
-  try {
-    const res = await documentApi.search(searchQuery.value.trim())
-    if (res.code === 200 && res.data) {
-      searchResults.value = res.data
-    }
-  } catch (error) {
-    console.error('搜索文档失败:', error)
-    ElMessage.error('搜索失败')
-  } finally {
-    searching.value = false
-  }
-}
-
-const handleFileChange = async (file) => {
-  uploading.value = true
-  try {
-    const formData = new FormData()
-    formData.append('file', file.raw)
-    const res = await documentApi.upload(formData)
-    if (res.code === 200) {
-      ElMessage.success('上传成功')
-      await loadDocs()
-    } else {
-      ElMessage.error(res.message || '上传失败')
-    }
-  } catch (error) {
-    console.error('上传文档失败:', error)
-    ElMessage.error('上传失败')
-  } finally {
-    uploading.value = false
-  }
-}
-
-const handleDocDelete = async (id) => {
-  try {
-    const res = await documentApi.deleteById(id)
-    if (res.code === 200) {
-      docs.value = docs.value.filter(d => d.id !== id)
-      if (searchResults.value !== null) {
-        searchResults.value = searchResults.value.filter(d => d.id !== id)
-      }
-      ElMessage.success('删除成功')
-    }
-  } catch (error) {
-    console.error('删除文档失败:', error)
-    ElMessage.error('删除失败')
-  }
-}
-
-const handleDocDownload = async (doc) => {
-  try {
-    await documentApi.downloadById(doc.id, doc.fileName)
-  } catch (error) {
-    console.error('下载文档失败:', error)
-    ElMessage.error('下载失败')
-  }
-}
-
-watch(activeSidebarTab, (newTab) => {
-  if (newTab === 'documents') {
-    loadDocs()
-  }
-})
-
-const handleLogout = async () => {
-  try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-
-    try {
-      await logout()
-    } catch (error) {
-      console.error('登出请求失败', error)
-    } finally {
-      userStore.logout()
-      ElMessage.success('已退出登录')
-      router.push('/login')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error(error)
-    }
-  }
-}
-
-const formatTime = (timeStr) => {
-  if (!timeStr) return ''
-  const date = new Date(timeStr)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 onMounted(async () => {
-  await loadSessions()
   await loadModelOptions()
-
-  if (route.query.conversationId) {
-    chatId.value = route.query.conversationId
-    // 加载已有会话的历史消息（回复未完成时自动轮询恢复）
-    try {
-      await loadMessages(chatId.value)
-    } catch (error) {
-      console.error('加载会话消息失败:', error)
-    }
+  const id = route.query.conversationId
+  if (id) {
+    chatStore.setCurrent(id)
+    await loadMessages(id)
   } else {
-    try {
-      const res = await chatMemoryApi.newConversationId()
-      chatId.value = res.data
-      router.replace({ path: '/chat-room', query: { conversationId: res.data } })
-    } catch (error) {
-      console.error('获取会话ID失败:', error)
-    }
+    await chatStore.newChat()
   }
 })
+
+// 侧边栏点会话 / 新聊天会推新 query → 这里触发加载；keep-alive 下组件保持活动也能响应
+watch(
+  () => route.query.conversationId,
+  (id, old) => {
+    if (id && id !== old) {
+      stopPolling()
+      chatStore.setCurrent(id)
+      loadMessages(id)
+    }
+  }
+)
 
 onUnmounted(stopPolling)
 </script>
 
 <style scoped lang="scss">
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-
-// ========== 玻璃态主题变量 ==========
-.chat-layout {
-  --glass-bg: rgba(255, 255, 255, 0.07);
-  --glass-bg-strong: rgba(255, 255, 255, 0.12);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --text-primary: #f4f7fb;
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-tertiary: rgba(255, 255, 255, 0.38);
-  --accent: #5eead4;
-  --accent-deep: #2dd4bf;
-
-  position: relative;
-  display: flex;
-  height: 100vh;
-  background-image: url('@/assets/back.jpg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-  font-family: 'Poppins', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-
-  // 深色遮罩层，让玻璃面板与白色文字清晰可读
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background: rgba(12, 18, 30, 0.72);
-    pointer-events: none;
-  }
-}
-
-// ---- 自定义滚动条 ----
-.sidebar,
-.session-list,
-.doc-list,
-.chat-messages {
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.16);
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-
-// ---- Sidebar ----
-.sidebar {
-  position: relative;
-  z-index: 1;
-  width: 280px;
-  flex-shrink: 0;
-  background: var(--glass-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-right: 1px solid var(--glass-border);
-  display: flex;
-  flex-direction: column;
-  color: var(--text-primary);
-
-  .sidebar-header {
-    padding: 20px 18px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    h2 {
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      color: var(--text-primary);
-      margin: 0;
-    }
-
-    :deep(.el-button) {
-      background: var(--glass-bg-strong);
-      border-color: var(--glass-border);
-      color: #fff;
-      border-radius: 10px;
-      transition: all 0.25s ease;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.22);
-        border-color: rgba(255, 255, 255, 0.3);
-      }
-    }
-  }
-
-  .session-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 6px 0;
-  }
-
-  .session-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 2px 10px;
-    padding: 11px 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-
-      .session-actions {
-        opacity: 1;
-      }
-    }
-
-    &.active {
-      background: linear-gradient(135deg, rgba(94, 234, 212, 0.22), rgba(45, 212, 191, 0.1));
-      box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.35);
-
-      .session-name {
-        color: #fff;
-      }
-    }
-
-    .session-name {
-      flex: 1;
-      font-size: 14px;
-      color: var(--text-primary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .session-actions {
-      opacity: 0;
-      transition: opacity 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      flex-shrink: 0;
-
-      :deep(.el-button) {
-        color: var(--text-secondary);
-
-        &:hover {
-          color: #fff;
-        }
-      }
-    }
-  }
-}
-
-.sidebar-tabs {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  :deep(.el-tabs__header) {
-    margin: 0;
-    padding: 6px 16px 0;
-  }
-
-  :deep(.el-tabs__nav-wrap::after) {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  :deep(.el-tabs__item) {
-    color: var(--text-secondary);
-    font-size: 14px;
-
-    &.is-active {
-      color: #fff;
-    }
-  }
-
-  :deep(.el-tabs__active-bar) {
-    background: var(--accent);
-  }
-
-  :deep(.el-tabs__content) {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :deep(.el-tab-pane) {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-}
-
-.doc-search-bar {
-  display: flex;
-  gap: 8px;
-  padding: 14px 16px 6px;
-
-  :deep(.el-input__wrapper) {
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: none;
-    border: 1px solid var(--glass-border);
-    border-radius: 10px;
-
-    .el-input__inner {
-      color: var(--text-primary);
-
-      &::placeholder {
-        color: var(--text-tertiary);
-      }
-    }
-  }
-
-  :deep(.el-button) {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #0c2230;
-    border-radius: 10px;
-
-    &:hover {
-      background: #7ff0dd;
-      border-color: #7ff0dd;
-    }
-  }
-}
-
-.doc-upload-bar {
-  padding: 6px 16px 8px;
-
-  :deep(.el-button) {
-    background: transparent;
-    border-color: var(--glass-border);
-    color: var(--text-primary);
-    border-radius: 10px;
-    transition: all 0.25s ease;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.14);
-      border-color: rgba(255, 255, 255, 0.3);
-    }
-  }
-}
-
-.doc-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
-
-  .doc-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 2px 10px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-
-      .doc-actions {
-        opacity: 1;
-      }
-    }
-
-    &.active {
-      background: linear-gradient(135deg, rgba(94, 234, 212, 0.22), rgba(45, 212, 191, 0.1));
-      box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.35);
-
-      .doc-name {
-        color: #fff;
-      }
-    }
-
-    .doc-name {
-      flex: 1;
-      font-size: 13px;
-      color: var(--text-primary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .doc-actions {
-      opacity: 0;
-      transition: opacity 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      flex-shrink: 0;
-
-      :deep(.el-button) {
-        color: var(--text-secondary);
-
-        &:hover {
-          color: #fff;
-        }
-      }
-    }
-  }
-}
-
-:deep(.el-empty__description p) {
-  color: var(--text-tertiary);
-}
-
-// ---- Main area ----
-.main-area {
+// ========== 聊天主区（外层背景 / 遮罩 / 字体由 AppLayout 的 glass.css 提供） ==========
+.chat-page {
   position: relative;
   z-index: 1;
   flex: 1;
-  display: flex;
-  flex-direction: column;
   min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 // ---- Header ----
 .chat-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 12px 24px;
   background: var(--glass-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--glass-border);
-  gap: 16px;
-
-  .header-left {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    :deep(.el-radio-button__inner) {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--glass-border);
-      color: var(--text-secondary);
-      transition: all 0.25s ease;
-    }
-
-    :deep(.el-radio-button:first-child .el-radio-button__inner) {
-      border-radius: 10px 0 0 10px;
-    }
-
-    :deep(.el-radio-button:last-child .el-radio-button__inner) {
-      border-radius: 0 10px 10px 0;
-    }
-
-    :deep(.el-radio-button.is-active .el-radio-button__inner) {
-      background: rgba(255, 255, 255, 0.95);
-      color: #0f1c2b;
-      border-color: transparent;
-      box-shadow: none;
-    }
-
-    .model-select {
-      width: 128px;
-    }
-
-    :deep(.model-select .el-select__wrapper) {
-      background: rgba(255, 255, 255, 0.06);
-      box-shadow: none;
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-    }
-
-    :deep(.model-select .el-select__wrapper.is-focused) {
-      box-shadow: 0 0 0 1px var(--accent) inset;
-    }
-
-    :deep(.model-select .el-select__placeholder) {
-      color: var(--text-tertiary);
-    }
-
-    :deep(.model-select .el-select__selected-item) {
-      color: var(--text-primary);
-    }
-
-    :deep(.model-select .el-select__caret) {
-      color: var(--text-secondary);
-    }
-  }
 
   .chat-title {
-    flex: 1;
-    text-align: center;
     font-size: 17px;
     font-weight: 600;
     letter-spacing: 1px;
     color: var(--text-primary);
-  }
-
-  .header-right {
-    flex-shrink: 0;
-
-    .user-info {
-      .user-avatar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        padding: 4px 10px;
-        border-radius: 20px;
-        transition: all 0.3s ease;
-
-        &:hover {
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-
-        :deep(.el-avatar) {
-          background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-          color: #0c2230;
-        }
-
-        .username {
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--text-primary);
-        }
-      }
-
-      .user-detail {
-        padding: 4px 0;
-
-        p {
-          margin: 8px 0;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          color: var(--text-secondary);
-
-          .el-icon {
-            color: var(--accent);
-          }
-        }
-      }
-    }
   }
 }
 
@@ -1508,16 +722,48 @@ onUnmounted(stopPolling)
   -webkit-backdrop-filter: blur(24px);
   border-top: 1px solid var(--glass-border);
 
+  // 新会话（无消息）时输入区整体垂直居中，上方显示问候语
+  &.centered {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: transparent;
+    border-top: none;
+  }
+
+  .welcome-greeting {
+    text-align: center;
+    margin-bottom: 32px;
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+  }
+
   .input-wrapper {
     position: relative;
+    width: 100%;
     max-width: 800px;
     margin: 0 auto;
     display: flex;
-    align-items: flex-end;
-    gap: 12px;
+    flex-direction: column;
+    gap: 10px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 20px;
-    padding: 12px 12px 12px 18px;
+    padding: 14px 16px 12px;
     border: 1px solid var(--glass-border);
     transition: border-color 0.2s, box-shadow 0.2s;
 
@@ -1527,15 +773,13 @@ onUnmounted(stopPolling)
     }
 
     .message-textarea {
-      flex: 1;
-
       :deep(.el-textarea__inner) {
         background-color: transparent;
         border: none;
         box-shadow: none;
         padding: 0;
         font-size: 15px;
-        line-height: 1.5;
+        line-height: 20px;
         max-height: 200px;
         resize: none;
         color: var(--text-primary);
@@ -1543,111 +787,129 @@ onUnmounted(stopPolling)
 
         &::placeholder {
           color: var(--text-tertiary);
+          line-height: 26px;
+          vertical-align: baseline;
         }
       }
     }
 
-    .send-button {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-deep)) !important;
-      border: none !important;
+    // 底部工具条：模式切换 + 模型选择在左，发送按钮推到最右
+    .input-toolbar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: all 0.2s;
+      gap: 10px;
 
-      .el-icon {
-        font-size: 18px;
-        color: #0c2230;
+      :deep(.el-radio-button__inner) {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 14px;
+        font-size: 12px;
+        line-height: 1;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--glass-border);
+        color: var(--text-secondary);
+        transition: all 0.25s ease;
       }
 
-      &:hover:not(.is-disabled) {
-        background: linear-gradient(135deg, #7ff0dd, #34d6bf) !important;
-        filter: brightness(1.05);
-        box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4);
+      :deep(.el-radio-button:first-child .el-radio-button__inner) {
+        border-radius: 10px 0 0 10px;
       }
 
-      &:disabled {
-        background: rgba(255, 255, 255, 0.12) !important;
-        cursor: not-allowed;
+      :deep(.el-radio-button:last-child .el-radio-button__inner) {
+        border-radius: 0 10px 10px 0;
+      }
+
+      :deep(.el-radio-button.is-active .el-radio-button__inner) {
+        background: rgba(255, 255, 255, 0.95);
+        color: #0f1c2b;
+        border-color: transparent;
+        box-shadow: none;
+      }
+
+      .model-select {
+        width: 140px;
+
+        :deep(.el-select__wrapper) {
+          height: 30px;
+          min-height: 30px;
+          padding: 0 12px;
+          display: flex;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.06);
+          box-shadow: none;
+          border: 1px solid var(--glass-border);
+          border-radius: 10px;
+        }
+
+        :deep(.el-select__selected-item),
+        :deep(.el-select__placeholder) {
+          line-height: 1;
+        }
+
+        :deep(.el-select__wrapper.is-focused) {
+          box-shadow: 0 0 0 1px var(--accent) inset;
+        }
+
+        :deep(.el-select__placeholder) {
+          color: var(--text-tertiary);
+        }
+
+        :deep(.el-select__selected-item) {
+          color: var(--text-primary);
+        }
+
+        :deep(.el-select__caret) {
+          color: var(--text-secondary);
+        }
+      }
+
+      .send-button {
+        margin-left: auto;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-deep)) !important;
+        border: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        flex-shrink: 0;
+        transition: all 0.2s;
 
         .el-icon {
-          color: var(--text-tertiary);
+          font-size: 17px;
+          color: #0c2230;
+        }
+
+        .send-spinner {
+          animation: sendSpin 1s linear infinite;
+        }
+
+        &:hover:not(.is-disabled) {
+          background: linear-gradient(135deg, #7ff0dd, #34d6bf) !important;
+          filter: brightness(1.05);
+          box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4);
+        }
+
+        &:disabled {
+          background: rgba(255, 255, 255, 0.12) !important;
+          cursor: not-allowed;
+
+          .el-icon {
+            color: var(--text-tertiary);
+          }
         }
       }
     }
   }
 }
-</style>
 
-<style lang="scss">
-// popper 挂载在 body，需全局样式；用特定 class 限定，避免污染其他页面
-.glass-popper.el-popper {
-  background: rgba(20, 27, 42, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  color: #f4f7fb;
-
-  .el-popper__arrow::before {
-    background: rgba(20, 27, 42, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-  }
-}
-
-.glass-popper .el-dropdown-menu {
-  background: transparent;
-  padding: 6px;
-
-  .el-dropdown-menu__item {
-    color: rgba(255, 255, 255, 0.85);
-
-    &:hover,
-    &:focus {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-    }
-  }
-
-  .el-dropdown-menu__item--divided {
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-  }
-}
-
-.glass-popper.el-popconfirm {
-  .el-popconfirm__main {
-    color: #f4f7fb;
-  }
-
-  .el-button {
-    border-radius: 9px;
-
-    &.el-button--primary {
-      background: #2dd4bf;
-      border-color: #2dd4bf;
-      color: #0c2230;
-
-      &:hover {
-        background: #5eead4;
-        border-color: #5eead4;
-      }
-    }
-
-    &:not(.el-button--primary) {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.2);
-      color: rgba(255, 255, 255, 0.85);
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.16);
-        color: #fff;
-      }
-    }
+@keyframes sendSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
