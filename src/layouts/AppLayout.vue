@@ -18,6 +18,15 @@
           <div class="nav-item" :class="{ active: route.name === 'McpConfig' }" @click="router.push('/mcp-config')">
             <el-icon><SetUp /></el-icon><span>MCP 配置</span>
           </div>
+          <div class="nav-item" :class="{ active: route.name === 'Skills' }" @click="router.push('/skills')">
+            <el-icon><MagicStick /></el-icon><span>技能管理</span>
+          </div>
+          <div class="nav-item" :class="{ active: route.name === 'Agents' }" @click="router.push('/agents')">
+            <el-icon><Avatar /></el-icon><span>Agent 管理</span>
+          </div>
+          <div class="nav-item" :class="{ active: route.name === 'Orchestrators' }" @click="router.push('/orchestrators')">
+            <el-icon><Connection /></el-icon><span>编排器管理</span>
+          </div>
         </nav>
       </div>
 
@@ -101,6 +110,9 @@ import {
   Document,
   Cpu,
   SetUp,
+  MagicStick,
+  Avatar,
+  Connection,
   Edit,
   Delete,
   UserFilled,

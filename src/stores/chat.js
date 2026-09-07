@@ -14,6 +14,8 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const chatMode = ref(localStorage.getItem('chatMode') || 'chat')
   const selectedModel = ref(localStorage.getItem('selectedModel') || '')
+  // Agent 模式下选中的对话目标：'' = 系统内置智能体 Manus；'agent:{id}' = 自定义 agent；'orch:{id}' = 编排器
+  const selectedTarget = ref(localStorage.getItem('selectedTarget') || '')
   const isSending = ref(false)
 
   const loadSessions = async () => {
@@ -106,7 +108,12 @@ export const useChatStore = defineStore('chat', () => {
     localStorage.setItem('selectedModel', m)
   }
 
-  // 退出登录时清空会话态，防止换账号残留（chatMode/selectedModel 是用户偏好，保留）
+  const setTarget = (v) => {
+    selectedTarget.value = v || ''
+    localStorage.setItem('selectedTarget', selectedTarget.value)
+  }
+
+  // 退出登录时清空会话态，防止换账号残留（chatMode/selectedModel/selectedTarget 是用户偏好，保留）
   const reset = () => {
     sessions.value = []
     loadingSessions.value = false
@@ -124,6 +131,7 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     chatMode,
     selectedModel,
+    selectedTarget,
     isSending,
     loadSessions,
     setCurrent,
@@ -133,6 +141,7 @@ export const useChatStore = defineStore('chat', () => {
     renameSession,
     setMode,
     setModel,
+    setTarget,
     reset,
   }
 })

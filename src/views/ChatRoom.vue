@@ -96,7 +96,27 @@
             <el-radio-button value="chat">Chat 模式</el-radio-button>
             <el-radio-button value="agent">Agent 模式</el-radio-button>
           </el-radio-group>
+          <!-- 对话目标选择（仅 Agent 模式）：内置智能体 / 自定义 Agent / 编排器，空值 = 内置 Manus -->
           <el-select
+            v-if="chatMode === 'agent'"
+            v-model="selectedTarget"
+            size="small"
+            class="agent-select"
+            popper-class="glass-popper"
+            placeholder="内置智能体"
+            @change="chatStore.setTarget"
+          >
+            <el-option label="内置智能体（Manus）" value="" />
+            <el-option-group v-if="optionsOfType('agent').length" label="自定义 Agent">
+              <el-option v-for="t in optionsOfType('agent')" :key="t.value" :label="t.label" :value="t.value" />
+            </el-option-group>
+            <el-option-group v-if="optionsOfType('orch').length" label="编排器">
+              <el-option v-for="t in optionsOfType('orch')" :key="t.value" :label="t.label" :value="t.value" />
+            </el-option-group>
+          </el-select>
+          <!-- 模型选择：Chat 档始终需要；Agent 档仅内置智能体需要（自定义 agent / 编排器用自身配置的模型） -->
+          <el-select
+            v-if="chatMode === 'chat' || !selectedTarget"
             v-model="selectedModel"
             size="small"
             class="model-select"
@@ -132,6 +152,8 @@ import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { User, UserFilled, Cpu, Top, Loading } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
+import { agentApi } from '@/api/agent'
+import { orchestratorApi } from '@/api/orchestrator'
 import { chatMemoryApi } from '@/api/chatMemory'
 import { llmConfigApi } from '@/api/llmConfig'
 import { useChatStore } from '@/stores/chat'
@@ -139,7 +161,7 @@ import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const route = useRoute()
 const chatStore = useChatStore()
-const { messages, chatMode, selectedModel, isSending, currentChatId } = storeToRefs(chatStore)
+const { messages, chatMode, selectedModel, selectedTarget, isSending, currentChatId } = storeToRefs(chatStore)
 
 // Model selection: 选中项存 "providerCode:modelName" 组合（如 "qwen:qwen-max"），选项来自用户 LLM 配置
 const modelGroups = ref([])
@@ -174,6 +196,24 @@ const splitModel = (value) => {
   const idx = value.indexOf(':')
   return idx === -1 ? [value, ''] : [value.slice(0, idx), value.slice(idx + 1)]
 }
+
+// Agent 模式下可选择的目标（仅启用的）：自定义 agent 与编排器，按类型分组展示
+const targetOptions = ref([])
+const loadTargetOptions = async () => {
+  try {
+    const [aRes, oRes] = await Promise.all([agentApi.list(), orchestratorApi.list()])
+    const agents = (aRes.data || [])
+      .filter((a) => a.enabled === 1)
+      .map((a) => ({ type: 'agent', value: `agent:${a.id}`, label: a.agentName }))
+    const orchs = (oRes.data || [])
+      .filter((o) => o.enabled === 1)
+      .map((o) => ({ type: 'orch', value: `orch:${o.id}`, label: o.orchestratorName }))
+    targetOptions.value = [...agents, ...orchs]
+  } catch (e) {
+    console.error(e)
+  }
+}
+const optionsOfType = (type) => targetOptions.value.filter((t) => t.type === type)
 
 const inputMessage = ref('')
 const messagesContainer = ref(null)
@@ -263,9 +303,12 @@ const loadMessages = async (conversationId, { poll = true } = {}) => {
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || isSending.value) return
-  if (!selectedModel.value) {
-    ElMessage.warning('请先在「LLM 配置」页面配置 API Key 和模型')
-    return
+  // 自定义 agent / 编排器使用自身配置的模型，无需用户选择；Chat 档与内置智能体（Manus）仍需模型
+  if (chatMode.value === 'chat' || !selectedTarget.value) {
+    if (!selectedModel.value) {
+      ElMessage.warning('请先在「LLM 配置」页面配置 API Key 和模型')
+      return
+    }
   }
 
   const userMessage = inputMessage.value.trim()
@@ -293,9 +336,16 @@ const sendMessage = async () => {
 
   try {
     const [model, modelName] = splitModel(selectedModel.value)
-    const stream = chatMode.value === 'agent'
-      ? aiApi.doChatWithManus(userMessage, targetChatId, model, modelName)
-      : aiApi.doChatWithLoveAppSse(userMessage, targetChatId, model, modelName)
+    let stream
+    if (chatMode.value === 'chat') {
+      stream = aiApi.doChatWithLoveAppSse(userMessage, targetChatId, model, modelName)
+    } else if (selectedTarget.value.startsWith('orch:')) {
+      stream = orchestratorApi.doChat(userMessage, targetChatId, selectedTarget.value.slice(5))
+    } else if (selectedTarget.value) {
+      stream = aiApi.doChatWithCustomAgent(userMessage, targetChatId, selectedTarget.value.slice(6))
+    } else {
+      stream = aiApi.doChatWithManus(userMessage, targetChatId, model, modelName)
+    }
     const reader = stream.getReader()
     let sessionsRefreshed = false
 
@@ -410,7 +460,7 @@ const getAnswerText = (stepEvents) => {
 }
 
 onMounted(async () => {
-  await loadModelOptions()
+  await Promise.all([loadModelOptions(), loadTargetOptions()])
   const id = route.query.conversationId
   if (id) {
     chatStore.setCurrent(id)
@@ -828,7 +878,8 @@ onUnmounted(stopPolling)
         box-shadow: none;
       }
 
-      .model-select {
+      .model-select,
+      .agent-select {
         width: 140px;
 
         :deep(.el-select__wrapper) {

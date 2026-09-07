@@ -45,6 +45,24 @@ const routes = [
         component: () => import('../views/McpConfig.vue'),
         meta: { title: 'MCP 配置' },
       },
+      {
+        path: 'skills',
+        name: 'Skills',
+        component: () => import('../views/SkillManage.vue'),
+        meta: { title: '技能管理' },
+      },
+      {
+        path: 'agents',
+        name: 'Agents',
+        component: () => import('../views/AgentManage.vue'),
+        meta: { title: 'Agent 管理' },
+      },
+      {
+        path: 'orchestrators',
+        name: 'Orchestrators',
+        component: () => import('../views/OrchestratorManage.vue'),
+        meta: { title: '编排器管理' },
+      },
     ],
   },
   {
