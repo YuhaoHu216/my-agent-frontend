@@ -29,6 +29,10 @@ export function injectRouter(r) {
 request.interceptors.response.use(
   (response) => {
     const { data } = response
+    // 文件流（blob）无业务信封，直接放行
+    if (response.config.responseType === 'blob') {
+      return data
+    }
     // 业务成功 (code === 200)
     if (data.code === 200) {
       return data

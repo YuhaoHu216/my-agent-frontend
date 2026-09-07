@@ -28,11 +28,25 @@
         <el-table-column prop="chunkCount" label="分块数" width="90" align="center">
           <template #default="{ row }">{{ row.chunkCount ?? '-' }}</template>
         </el-table-column>
+        <el-table-column label="向量模型" width="150">
+          <template #default="{ row }">{{ row.vectorModel || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="用途" width="110" align="center">
+          <template #default="{ row }">
+            <template v-if="typeof row.vectorized === 'boolean'">
+              <el-tag :type="row.vectorized ? 'success' : 'warning'" effect="light">
+                {{ row.vectorized ? '已向量化' : '中转文件' }}
+              </el-tag>
+            </template>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="上传时间" width="170">
           <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" align="center">
+        <el-table-column label="操作" width="150" align="center">
           <template #default="{ row }">
+            <el-button v-if="row.vectorized" link type="primary" @click="openChunks(row)">分块</el-button>
             <el-button link @click="handleDocDownload(row)">
               <el-icon><Download /></el-icon>
             </el-button>
@@ -57,22 +71,41 @@
       </el-table>
     </el-card>
 
-    <section class="glass-card vector-info">
-      <h3>存入向量数据库的文档信息</h3>
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="该功能后端尚未实现，当前为占位区"
-        class="vector-tips"
-      />
-      <div class="vector-placeholder">
-        <el-empty
-          description="向量化文档信息将在后端支持后展示：文档名称 / 分块数 / 向量模型 / 向量化状态 / 入库时间"
-          :image-size="90"
-        />
+    <el-dialog v-model="chunkDialogVisible" :title="chunkDialogTitle" width="880px" top="5vh" class="chunk-dialog">
+      <div v-loading="chunkLoading" class="chunk-layout">
+        <template v-if="chunkList.length">
+          <ul class="chunk-nav">
+            <li
+              v-for="(chunk, i) in chunkList"
+              :key="chunk.chunkId || i"
+              :class="{ active: activeChunk === i }"
+              @click="activeChunk = i"
+            >
+              <span class="chunk-nav-index">第 {{ (chunk.chunkIndex ?? i) + 1 }} 片</span>
+              <span class="chunk-nav-title">{{ navTitle(chunk) }}</span>
+              <span class="chunk-nav-meta">{{ chunk.content ? chunk.content.length : 0 }} 字</span>
+            </li>
+          </ul>
+          <div v-if="activeChunkData" class="chunk-detail">
+            <div class="chunk-detail-head">
+              <span class="chunk-detail-count">
+                第 {{ (activeChunkData.chunkIndex ?? activeChunk) + 1 }} / {{ activeChunkData.totalChunks ?? chunkList.length }} 片
+              </span>
+              <span v-if="activeChunkData.title" class="chunk-detail-title">{{ activeChunkData.title }}</span>
+              <el-button-group class="chunk-detail-pager">
+                <el-button size="small" :disabled="activeChunk === 0" @click="activeChunk--">上一片</el-button>
+                <el-button size="small" :disabled="activeChunk === chunkList.length - 1" @click="activeChunk++">下一片</el-button>
+              </el-button-group>
+            </div>
+            <div class="chunk-detail-content">{{ activeChunkData.content }}</div>
+          </div>
+        </template>
+        <el-empty v-else-if="!chunkLoading" description="该文档暂无分片内容" :image-size="80" />
       </div>
-    </section>
+      <template #footer>
+        <el-button @click="chunkDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -88,6 +121,18 @@ const searchQuery = ref('')
 const searching = ref(false)
 const searchResults = ref(null)
 const uploading = ref(false)
+const chunkDialogVisible = ref(false)
+const chunkDialogTitle = ref('')
+const chunkList = ref([])
+const chunkLoading = ref(false)
+const activeChunk = ref(0)
+const activeChunkData = computed(() => chunkList.value[activeChunk.value] || null)
+const navTitle = (chunk) => {
+  const raw = (chunk.title && chunk.title.trim())
+    ? chunk.title.trim()
+    : (chunk.content ? chunk.content.replace(/\s+/g, ' ').trim() : '')
+  return raw.length > 18 ? `${raw.slice(0, 18)}…` : (raw || '无标题')
+}
 
 const filteredDocs = computed(() => {
   return searchResults.value !== null ? searchResults.value : docs.value
@@ -182,6 +227,25 @@ const handleDocDelete = async (id) => {
   }
 }
 
+const openChunks = async (row) => {
+  chunkDialogTitle.value = `${row.fileName} 的分片内容`
+  chunkList.value = []
+  activeChunk.value = 0
+  chunkDialogVisible.value = true
+  chunkLoading.value = true
+  try {
+    const res = await documentApi.chunks(row.id)
+    if (res.code === 200 && res.data) {
+      chunkList.value = res.data
+    }
+  } catch (error) {
+    console.error('获取文档分片失败:', error)
+    ElMessage.error('获取分片失败')
+  } finally {
+    chunkLoading.value = false
+  }
+}
+
 const handleDocDownload = async (doc) => {
   try {
     await documentApi.downloadById(doc.id, doc.fileName)
@@ -203,22 +267,106 @@ onMounted(loadDocs)
   margin-bottom: 20px;
 }
 
-.vector-info {
-  padding: 20px 24px;
+.chunk-layout {
+  display: flex;
+  gap: 18px;
+  height: 62vh;
 }
 
-.vector-info h3 {
-  margin: 0 0 16px;
-  font-size: 16px;
+.chunk-nav {
+  flex: 0 0 232px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-y: auto;
+  border-right: 1px solid var(--el-border-color-lighter);
+}
+
+.chunk-nav li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chunk-nav li:hover {
+  background: var(--el-fill-color-light);
+}
+
+.chunk-nav li.active {
+  background: var(--el-color-primary-light-9);
+  box-shadow: inset 2px 0 0 var(--el-color-primary);
+}
+
+.chunk-nav-index {
   font-weight: 600;
+  font-size: 13px;
   color: var(--text-primary);
 }
 
-.vector-tips {
-  margin-bottom: 16px;
+.chunk-nav-title {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.vector-placeholder {
-  padding: 8px 0 4px;
+.chunk-nav-meta {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
 }
+
+.chunk-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chunk-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px 10px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.chunk-detail-count {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.chunk-detail-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.chunk-detail-pager {
+  flex: 0 0 auto;
+}
+
+.chunk-detail-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 4px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.8;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
 </style>

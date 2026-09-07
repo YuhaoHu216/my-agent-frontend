@@ -11,6 +11,10 @@ export const documentApi = {
     return request.get('/document/list')
   },
 
+  chunks(id) {
+    return request.get(`/document/${id}/chunks`)
+  },
+
   search(query, topK = 10) {
     return request.post('/document/search', { query, topK })
   },
