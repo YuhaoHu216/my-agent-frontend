@@ -343,6 +343,7 @@
 .app-layout .el-table {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
+  --el-fill-color-lighter: transparent;
   --el-table-header-bg-color: rgba(255, 255, 255, 0.06);
   --el-table-header-text-color: var(--text-primary);
   --el-table-text-color: var(--text-primary);
